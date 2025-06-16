@@ -43,6 +43,8 @@ class Teleoperator(abc.ABC):
         self.calibration: dict[str, MotorCalibration] = {}
         if self.calibration_fpath.is_file():
             self._load_calibration()
+        print(f"Calibration directory: {self.calibration_dir}")
+        print(f"Calibration file path: {self.calibration_fpath}")
 
     def __str__(self) -> str:
         return f"{self.id} {self.__class__.__name__}"

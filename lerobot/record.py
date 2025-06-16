@@ -125,7 +125,7 @@ class DatasetRecordConfig:
 
 @dataclass
 class RecordConfig:
-    robot: RobotConfig
+    robot: RobotConfig | None = None  # Make robot optional
     dataset: DatasetRecordConfig
     # Whether to control the robot with a teleoperator
     teleop: TeleoperatorConfig | None = None
@@ -142,6 +142,9 @@ class RecordConfig:
         if bool(self.teleop) == bool(self.policy):
             raise ValueError("Choose either a policy or a teleoperator to control the robot")
 
+        if self.robot is None and self.teleop is None:
+            raise ValueError("You must provide at least a robot or a teleoperator")
+
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
         policy_path = parser.get_path_arg("policy")
         if policy_path:
@@ -157,7 +160,7 @@ class RecordConfig:
 
 @safe_stop_image_writer
 def record_loop(
-    robot: Robot,
+    robot: Robot | None,
     events: dict,
     fps: int,
     dataset: LeRobotDataset | None = None,
@@ -179,10 +182,10 @@ def record_loop(
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
 
-        observation = robot.get_observation()
+        observation = robot.get_observation() if robot is not None else {}
 
         if policy is not None or dataset is not None:
-            observation_frame = build_dataset_frame(dataset.features, observation, prefix="observation")
+            observation_frame = build_dataset_frame(dataset.features, observation, prefix="observation") if robot is not None else {}
 
         if policy is not None:
             action_values = predict_action(
@@ -191,18 +194,18 @@ def record_loop(
                 get_safe_torch_device(policy.config.device),
                 policy.config.use_amp,
                 task=single_task,
-                robot_type=robot.robot_type,
+                robot_type=robot.robot_type if robot is not None else None,
             )
-            action = {key: action_values[i].item() for i, key in enumerate(robot.action_features)}
+            action = {key: action_values[i].item() for i, key in enumerate(robot.action_features)} if robot is not None else {}
         else:
-            action = teleop.get_action()
+            action = teleop.get_action() if teleop is not None else {}
 
         # Action can eventually be clipped using `max_relative_target`,
         # so action actually sent is saved in the dataset.
-        sent_action = robot.send_action(action)
+        sent_action = robot.send_action(action) if robot is not None else action
 
         if dataset is not None:
-            action_frame = build_dataset_frame(dataset.features, sent_action, prefix="action")
+            action_frame = build_dataset_frame(dataset.features, sent_action, prefix="action") if robot is not None else {}
             frame = {**observation_frame, **action_frame}
             dataset.add_frame(frame, task=single_task)
 
@@ -232,11 +235,11 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
     if cfg.display_data:
         _init_rerun(session_name="recording")
 
-    robot = make_robot_from_config(cfg.robot)
+    robot = make_robot_from_config(cfg.robot) if cfg.robot is not None else None
     teleop = make_teleoperator_from_config(cfg.teleop) if cfg.teleop is not None else None
 
-    action_features = hw_to_dataset_features(robot.action_features, "action", cfg.dataset.video)
-    obs_features = hw_to_dataset_features(robot.observation_features, "observation", cfg.dataset.video)
+    action_features = hw_to_dataset_features(robot.action_features, "action", cfg.dataset.video) if robot is not None else {}
+    obs_features = hw_to_dataset_features(robot.observation_features, "observation", cfg.dataset.video) if robot is not None else {}
     dataset_features = {**action_features, **obs_features}
 
     if cfg.resume:
@@ -245,7 +248,7 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
             root=cfg.dataset.root,
         )
 
-        if hasattr(robot, "cameras") and len(robot.cameras) > 0:
+        if robot is not None and hasattr(robot, "cameras") and len(robot.cameras) > 0:
             dataset.start_image_writer(
                 num_processes=cfg.dataset.num_image_writer_processes,
                 num_threads=cfg.dataset.num_image_writer_threads_per_camera * len(robot.cameras),
@@ -258,17 +261,18 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
             cfg.dataset.repo_id,
             cfg.dataset.fps,
             root=cfg.dataset.root,
-            robot_type=robot.name,
+            robot_type=robot.name if robot is not None else None,
             features=dataset_features,
             use_videos=cfg.dataset.video,
             image_writer_processes=cfg.dataset.num_image_writer_processes,
-            image_writer_threads=cfg.dataset.num_image_writer_threads_per_camera * len(robot.cameras),
+            image_writer_threads=cfg.dataset.num_image_writer_threads_per_camera * len(robot.cameras) if robot is not None else 0,
         )
 
     # Load pretrained policy
     policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
 
-    robot.connect()
+    if robot is not None:
+        robot.connect()
     if teleop is not None:
         teleop.connect()
 
@@ -318,8 +322,10 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
 
     log_say("Stop recording", cfg.play_sounds, blocking=True)
 
-    robot.disconnect()
-    teleop.disconnect()
+    if robot is not None:
+        robot.disconnect()
+    if teleop is not None:
+        teleop.disconnect()
 
     if not is_headless() and listener is not None:
         listener.stop()

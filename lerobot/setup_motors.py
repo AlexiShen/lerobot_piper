@@ -42,6 +42,7 @@ from .common.teleoperators import (  # noqa: F401
     make_teleoperator_from_config,
     so100_leader,
     so101_leader,
+    so102_leader
 )
 
 COMPATIBLE_DEVICES = [

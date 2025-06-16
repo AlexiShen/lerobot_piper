@@ -50,3 +50,4 @@ HF_LEROBOT_HOME = Path(os.getenv("HF_LEROBOT_HOME", default_cache_path)).expandu
 # calibration dir
 default_calibration_path = HF_LEROBOT_HOME / "calibration"
 HF_LEROBOT_CALIBRATION = Path(os.getenv("HF_LEROBOT_CALIBRATION", default_calibration_path)).expanduser()
+print(HF_LEROBOT_CALIBRATION)

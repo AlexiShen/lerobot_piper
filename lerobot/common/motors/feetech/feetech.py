@@ -247,6 +247,7 @@ class FeetechMotorsBus(MotorsBus):
             self.calibration[motor].homing_offset == cal.homing_offset
             for motor, cal in motors_calibration.items()
         )
+        #print('returning feetech calibration info')
         return same_ranges and same_offsets
 
     def read_calibration(self) -> dict[str, MotorCalibration]:

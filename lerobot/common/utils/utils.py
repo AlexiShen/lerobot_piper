@@ -109,7 +109,7 @@ def is_amp_available(device: str):
         raise ValueError(f"Unknown device '{device}.")
 
 
-def init_logging():
+def init_logging(log_file: str = "lerobot.log"):
     def custom_format(record):
         dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         fnameline = f"{record.pathname}:{record.lineno}"
@@ -123,9 +123,16 @@ def init_logging():
 
     formatter = logging.Formatter()
     formatter.format = custom_format
+
+    # StreamHandler for console output
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logging.getLogger().addHandler(console_handler)
+
+    # FileHandler for recording logs into a file
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+    logging.getLogger().addHandler(file_handler)
 
 
 def format_big_number(num, precision=0):

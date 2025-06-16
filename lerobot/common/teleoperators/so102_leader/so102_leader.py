@@ -16,6 +16,8 @@
 
 import logging
 import time
+import json
+import os
 
 from lerobot.common.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.common.motors import Motor, MotorCalibration, MotorNormMode
@@ -50,7 +52,7 @@ class SO102Leader(Teleoperator):
                 "elbow_roll": Motor(4, "sts3215", MotorNormMode.RANGE_M100_100),
                 "wrist_flex": Motor(5, "sts3215", MotorNormMode.RANGE_M100_100),
                 "wrist_roll": Motor(6, "sts3215", MotorNormMode.RANGE_M100_100),
-                "gripper": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
+                # "gripper": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )
@@ -72,8 +74,17 @@ class SO102Leader(Teleoperator):
             raise DeviceAlreadyConnectedError(f"{self} already connected")
 
         self.bus.connect()
+
+        # Check if calibration file exists at the same path as used in calibrate (self.calibration_fpath)
+        calibration_file = self.calibration_fpath
+
         if not self.is_calibrated and calibrate:
-            self.calibrate()
+            if calibration_file.exists():
+                logger.info(f"Calibration file exists at {calibration_file}.")
+                self.load_calibration()
+            else:
+                logger.info(f"Calibration file does not exist at {calibration_file}.")
+                self.calibrate()
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -82,6 +93,7 @@ class SO102Leader(Teleoperator):
     def is_calibrated(self) -> bool:
         return self.bus.is_calibrated
 
+    
     def calibrate(self) -> None:
         logger.info(f"\nRunning calibration of {self}")
         self.bus.disable_torque()
@@ -107,9 +119,13 @@ class SO102Leader(Teleoperator):
                 range_max=range_maxes[motor],
             )
 
+        # Save calibration file in the SO102Leader directory
         self.bus.write_calibration(self.calibration)
+        # calibration_fpath = self.calibration_dir / f"{self.id}_so102_calibration.json"
+        # self._save_calibration(fpath=calibration_fpath)
+        # logger.info(f"Calibration saved to {calibration_fpath}")
         self._save_calibration()
-        logger.info(f"Calibration saved to {self.calibration_fpath}")
+        logger.info("Calibration saved to {self.calibration_fpath}")
 
     def configure(self) -> None:
         self.bus.disable_torque()
@@ -118,10 +134,18 @@ class SO102Leader(Teleoperator):
             self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
 
     def setup_motors(self) -> None:
+        # Original implementation:
         for motor in reversed(self.bus.motors):
             input(f"Connect the controller board to the '{motor}' motor only and press enter.")
             self.bus.setup_motor(motor)
             print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
+
+        # Updated implementation to skip the last two motors:
+        # motors_to_setup = list(self.bus.motors)[:-2]  # Skip the last two motors
+        # for motor in reversed(motors_to_setup):
+        #     input(f"Connect the controller board to the '{motor}' motor only and press enter.")
+        #     self.bus.setup_motor(motor)
+        #     print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
 
     def get_action(self) -> dict[str, float]:
         start = time.perf_counter()
@@ -141,3 +165,26 @@ class SO102Leader(Teleoperator):
 
         self.bus.disconnect()
         logger.info(f"{self} disconnected.")
+
+    def load_calibration(self) -> None:
+        """
+        Load calibration from the JSON file, set self.calibration, and write to motors.
+        """
+        with open(self.calibration_fpath, "r") as f:
+            calib_dict = json.load(f)
+        self.calibration = {
+            motor: MotorCalibration(**params)
+            for motor, params in calib_dict.items()
+        }
+        self.bus.write_calibration(self.calibration)
+        logger.info(f"Loaded calibration from {self.calibration_fpath} and wrote to motors.")
+
+    # def _save_calibration(self) -> None:
+    #     # Ensure the calibration file is saved inside the teleoperator directory
+    #     calibration_dir = self.config.teleoperator_dir  # Assuming teleoperator_dir is defined in the config
+    #     calibration_path = calibration_dir / "calibration.json"
+
+    #     with open(calibration_path, "w") as f:
+    #         json.dump(self.calibration, f, indent=4)
+
+    #     logger.info(f"Calibration saved to {calibration_path}")
