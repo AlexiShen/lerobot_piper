@@ -50,7 +50,7 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
 
         return MockRobot(config)
     elif config.type == "piper_robot":
-        from .piper import PiperRobot
+        from .piper_robot import PiperRobot
 
         return PiperRobot(config)
     else:
