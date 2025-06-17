@@ -53,7 +53,8 @@ from lerobot.common.utils.visualization_utils import _init_rerun
 
 @dataclass
 class TeleoperateOnlyConfig:
-    teleop: TeleoperatorConfig
+    #teleop: TeleoperatorConfig
+    teleop: so102_leader.SO102LeaderConfig
     fps: int = 60
     teleop_time_s: float | None = None
     display_data: bool = False
@@ -66,6 +67,10 @@ def teleop_only_loop(
     while True:
         loop_start = time.perf_counter()
         action = teleop.get_action()
+
+        # Send feedback: set each joint to 0
+        feedback = {joint: 0 for joint in action.keys()}
+        teleop.send_feedback(feedback)
 
         if display_data:
             for act, val in action.items():

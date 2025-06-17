@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import abc
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -38,13 +39,17 @@ class Teleoperator(abc.ABC):
             if config.calibration_dir
             else HF_LEROBOT_CALIBRATION / TELEOPERATORS / self.name
         )
+        # print(f"{self.calibration_dir}")
         self.calibration_dir.mkdir(parents=True, exist_ok=True)
         self.calibration_fpath = self.calibration_dir / f"{self.id}.json"
         self.calibration: dict[str, MotorCalibration] = {}
         if self.calibration_fpath.is_file():
+            logging.info(
+                f"Loading calibration from {self.calibration_fpath} for teleoperator {self.id}."
+            )
             self._load_calibration()
-        print(f"Calibration directory: {self.calibration_dir}")
-        print(f"Calibration file path: {self.calibration_fpath}")
+        # print(f"Calibration directory: {self.calibration_dir}")
+        # print(f"Calibration file path: {self.calibration_fpath}")
 
     def __str__(self) -> str:
         return f"{self.id} {self.__class__.__name__}"

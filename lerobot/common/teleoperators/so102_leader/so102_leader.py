@@ -43,6 +43,7 @@ class SO102Leader(Teleoperator):
     def __init__(self, config: SO102LeaderConfig):
         super().__init__(config)
         self.config = config
+        self.config.calibration_dir = os.path.dirname(os.path.abspath(__file__))
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
@@ -76,15 +77,15 @@ class SO102Leader(Teleoperator):
         self.bus.connect()
 
         # Check if calibration file exists at the same path as used in calibrate (self.calibration_fpath)
-        calibration_file = self.calibration_fpath
+        calibration_file = self.calibration_dir / f"{self.id}.json"
 
         if not self.is_calibrated and calibrate:
-            if calibration_file.exists():
-                logger.info(f"Calibration file exists at {calibration_file}.")
-                self.load_calibration()
-            else:
-                logger.info(f"Calibration file does not exist at {calibration_file}.")
-                self.calibrate()
+            # if calibration_file.exists():
+            #     logger.info(f"Calibration file exists at {calibration_file}.")
+            #     self.load_calibration()
+            # else:
+            #     logger.info(f"Calibration file does not exist at {calibration_file}.")
+            self.calibrate()
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -156,8 +157,14 @@ class SO102Leader(Teleoperator):
         return action
 
     def send_feedback(self, feedback: dict[str, float]) -> None:
-        # TODO(rcadene, aliberts): Implement force feedback
-        raise NotImplementedError
+        # Sync write to Goal_Position using feedback dict
+        # feedback keys may be like 'shoulder_pan.pos', so strip '.pos' if present
+        print(f"Sending feedback: {feedback}")
+        for motor, value in feedback.items():
+            motor = motor.split(".")[0]
+            self.bus.write("Goal_Position", motor, value)
+        logger.info(f"{self} sent feedback: {feedback}")
+
 
     def disconnect(self) -> None:
         if not self.is_connected:
