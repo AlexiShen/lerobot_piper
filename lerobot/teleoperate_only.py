@@ -69,8 +69,8 @@ def teleop_only_loop(
         action = teleop.get_action()
 
         # Send feedback: set each joint to 0
-        feedback = {joint: 0 for joint in action.keys()}
-        teleop.send_feedback(feedback)
+        # feedback = {joint: 0 for joint in action.keys()}
+        # teleop.send_feedback(feedback)
 
         if display_data:
             for act, val in action.items():

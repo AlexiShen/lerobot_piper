@@ -18,6 +18,7 @@ import logging
 import time
 import json
 import os
+from pathlib import Path
 
 from lerobot.common.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.common.motors import Motor, MotorCalibration, MotorNormMode
@@ -41,9 +42,13 @@ class SO102Leader(Teleoperator):
     name = "so102_leader"
 
     def __init__(self, config: SO102LeaderConfig):
+        # Ensure calibration_dir is a Path before calling super().__init__
+        if config.calibration_dir is None:
+            config.calibration_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        else:
+            config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
         self.config = config
-        self.config.calibration_dir = os.path.dirname(os.path.abspath(__file__))
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={

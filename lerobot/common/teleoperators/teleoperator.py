@@ -39,7 +39,7 @@ class Teleoperator(abc.ABC):
             if config.calibration_dir
             else HF_LEROBOT_CALIBRATION / TELEOPERATORS / self.name
         )
-        # print(f"{self.calibration_dir}")
+        print(f"Config Calibration directory: {config.calibration_dir}")
         self.calibration_dir.mkdir(parents=True, exist_ok=True)
         self.calibration_fpath = self.calibration_dir / f"{self.id}.json"
         self.calibration: dict[str, MotorCalibration] = {}
@@ -48,8 +48,8 @@ class Teleoperator(abc.ABC):
                 f"Loading calibration from {self.calibration_fpath} for teleoperator {self.id}."
             )
             self._load_calibration()
-        # print(f"Calibration directory: {self.calibration_dir}")
-        # print(f"Calibration file path: {self.calibration_fpath}")
+        print(f"Calibration directory: {self.calibration_dir}")
+        print(f"Calibration file path: {self.calibration_fpath}")
 
     def __str__(self) -> str:
         return f"{self.id} {self.__class__.__name__}"
