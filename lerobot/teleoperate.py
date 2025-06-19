@@ -20,7 +20,7 @@ Example:
 ```shell
 python -m lerobot.teleoperate \
     --robot.type=so101_follower \
-    --robot.port=/dev/tty.usbmodem58760431541 \
+    --robot.port=/dev/t.ty.usbmodem58760431541 \
     --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30}}" \
     --robot.id=black \
     --teleop.type=so101_leader \
@@ -38,6 +38,7 @@ from pprint import pformat
 import draccus
 import numpy as np
 import rerun as rr
+import rospy
 
 from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
 from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
@@ -48,6 +49,7 @@ from lerobot.common.robots import (  # noqa: F401
     make_robot_from_config,
     so100_follower,
     so101_follower,
+    piper_robot,
 )
 from lerobot.common.teleoperators import (
     Teleoperator,
@@ -58,7 +60,7 @@ from lerobot.common.utils.robot_utils import busy_wait
 from lerobot.common.utils.utils import init_logging, move_cursor_up
 from lerobot.common.utils.visualization_utils import _init_rerun
 
-from .common.teleoperators import koch_leader, so100_leader, so101_leader  # noqa: F401
+from .common.teleoperators import koch_leader, so100_leader, so101_leader, so102_leader # noqa: F401
 
 
 @dataclass
@@ -75,23 +77,31 @@ class TeleoperateConfig:
 def teleop_loop(
     teleop: Teleoperator, robot: Robot, fps: int, display_data: bool = False, duration: float | None = None
 ):
-    display_len = max(len(key) for key in robot.action_features)
+    # display_len = max(len(key) for key in robot.action_features)
+    display_len = max(len(key) for key in teleop.action_features)
     start = time.perf_counter()
     while True:
+        if rospy.is_shutdown():
+            break
         loop_start = time.perf_counter()
         action = teleop.get_action()
-        if display_data:
-            observation = robot.get_observation()
-            for obs, val in observation.items():
-                if isinstance(val, float):
-                    rr.log(f"observation_{obs}", rr.Scalars(val))
-                elif isinstance(val, np.ndarray):
-                    rr.log(f"observation_{obs}", rr.Image(val), static=True)
-            for act, val in action.items():
-                if isinstance(val, float):
-                    rr.log(f"action_{act}", rr.Scalars(val))
+        observation = robot.get_observation()
+        # if display_data:
+        #     observation = robot.get_observation()
+        #     for obs, val in observation.items():
+        #         if isinstance(val, float):
+        #             rr.log(f"observation_{obs}", rr.Scalars(val))
+        #         elif isinstance(val, np.ndarray):
+        #             rr.log(f"observation_{obs}", rr.Image(val), static=True)
+        #     for act, val in action.items():
+        #         if isinstance(val, float):
+        #             rr.log(f"action_{act}", rr.Scalars(val))
 
-        robot.send_action(action)
+        # robot.send_action(action)
+        zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
+        joint_names = [key.removesuffix(".pos") for key in robot.action_features]
+        zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
+        action_sent = robot.send_action(zero_action)
         dt_s = time.perf_counter() - loop_start
         busy_wait(1 / fps - dt_s)
 
@@ -101,12 +111,18 @@ def teleop_loop(
         print(f"{'NAME':<{display_len}} | {'NORM':>7}")
         for motor, value in action.items():
             print(f"{motor:<{display_len}} | {value:>7.2f}")
+        print(f"{'Observations':<{display_len}} | {'Rad':>7}")
+        for obs, val in observation.items():
+            print(f"{obs:<{display_len}} | {val:>7.2f}")
+        print(f"{'Action sent':<{display_len}} | {'Rad':>7}")
+        for act, val in action_sent.items():
+            print(f"{act:<{display_len}} | {val:>7.2f}")
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
             return
 
-        move_cursor_up(len(action) + 5)
+        move_cursor_up(len(action) + len(observation) + len(action_sent) + 8)
 
 
 @draccus.wrap()
@@ -131,6 +147,7 @@ def teleoperate(cfg: TeleoperateConfig):
             rr.rerun_shutdown()
         teleop.disconnect()
         robot.disconnect()
+        rospy.signal_shutdown("User requested shutdown")
 
 
 if __name__ == "__main__":

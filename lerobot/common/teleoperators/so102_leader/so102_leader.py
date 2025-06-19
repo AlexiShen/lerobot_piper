@@ -52,13 +52,13 @@ class SO102Leader(Teleoperator):
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
-                "shoulder_pan": Motor(1, "sts3215", MotorNormMode.RANGE_M100_100),
-                "shoulder_lift": Motor(2, "sts3215", MotorNormMode.RANGE_M100_100),
-                "elbow_flex": Motor(3, "sts3215", MotorNormMode.RANGE_M100_100),
-                "elbow_roll": Motor(4, "sts3215", MotorNormMode.RANGE_M100_100),
-                "wrist_flex": Motor(5, "sts3215", MotorNormMode.RANGE_M100_100),
-                "wrist_roll": Motor(6, "sts3215", MotorNormMode.RANGE_M100_100),
-                # "gripper": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
+                "joint0": Motor(1, "sts3215", MotorNormMode.RANGE_M100_100),
+                "joint1": Motor(2, "sts3215", MotorNormMode.RANGE_M100_100),
+                "joint2": Motor(3, "sts3215", MotorNormMode.RANGE_M100_100),
+                "joint3": Motor(4, "sts3215", MotorNormMode.RANGE_M100_100),
+                "joint4": Motor(5, "sts3215", MotorNormMode.RANGE_M100_100),
+                "joint5": Motor(6, "sts3215", MotorNormMode.RANGE_M100_100),
+                # "joint6": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )

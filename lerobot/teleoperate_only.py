@@ -34,10 +34,13 @@ from pprint import pformat
 import draccus
 import rerun as rr
 
+
+
 from lerobot.common.robots import (  # noqa: F401
     Robot,
     RobotConfig,
     make_robot_from_config,
+    piper_robot,
 )
 
 from lerobot.common.teleoperators import (
