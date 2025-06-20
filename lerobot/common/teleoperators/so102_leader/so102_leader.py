@@ -30,6 +30,8 @@ from lerobot.common.motors.feetech import (
 from ..teleoperator import Teleoperator
 from .config_so102_leader import SO102LeaderConfig
 
+import pinocchio as pin
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,13 +54,13 @@ class SO102Leader(Teleoperator):
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
-                "joint0": Motor(1, "sts3215", MotorNormMode.RADIANS),
-                "joint1": Motor(2, "sts3215", MotorNormMode.RADIANS),
-                "joint2": Motor(3, "sts3215", MotorNormMode.RADIANS),
-                "joint3": Motor(4, "sts3215", MotorNormMode.RADIANS),
-                "joint4": Motor(5, "sts3215", MotorNormMode.RADIANS),
-                "joint5": Motor(6, "sts3215", MotorNormMode.RADIANS),
-                # "joint6": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
+                "joint1": Motor(1, "sts3215", MotorNormMode.RADIANS),
+                "joint2": Motor(2, "sts3215", MotorNormMode.RADIANS),
+                "joint3": Motor(3, "sts3215", MotorNormMode.RADIANS),
+                "joint4": Motor(4, "sts3215", MotorNormMode.RADIANS),
+                "joint5": Motor(5, "sts3215", MotorNormMode.RADIANS),
+                "joint6": Motor(6, "sts3215", MotorNormMode.RADIANS),
+                # "joint7": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )

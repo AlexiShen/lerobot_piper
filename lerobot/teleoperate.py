@@ -97,11 +97,11 @@ def teleop_loop(
         #         if isinstance(val, float):
         #             rr.log(f"action_{act}", rr.Scalars(val))
 
-        # robot.send_action(action)
-        zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
-        joint_names = [key.removesuffix(".pos") for key in robot.action_features]
-        zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
-        action_sent = robot.send_action(zero_action)
+        action_sent = robot.send_action(action)
+        # zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
+        # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
+        # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
+        # action_sent = robot.send_action(zero_action)
         dt_s = time.perf_counter() - loop_start
         busy_wait(1 / fps - dt_s)
 

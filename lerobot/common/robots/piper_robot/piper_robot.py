@@ -30,8 +30,9 @@ from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import Trigger  # Common for simple enable/reset/stop services
 
 from ..robot import Robot
-from ..utils import ensure_safe_goal_position
+# from ..utils import ensure_safe_goal_position
 from .config_piper_robot import PiperRobotConfig
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +50,40 @@ class PiperRobot(Robot):
         self.logs = {}
 
         self.joints = {
-            "joint0": 0.0,
             "joint1": 0.0,
             "joint2": 0.0,
             "joint3": 0.0,
             "joint4": 0.0,
             "joint5": 0.0,
             "joint6": 0.0,
+            "joint7": 0.0,
         }
+
+        self.joint_limits_degrees = {
+            "joint1": (-154, 154),  # Example limits in radians
+            "joint2": (0, 195),
+            "joint3": (-175, 0),
+            "joint4": (-106, 106),
+            "joint5": (-75, 75),
+            "joint6": (-100, 100),
+            "joint7": (0.0, 1.0),  # Example limits for gripper
+        }
+
+        self.joint_limits = {
+            joint: (math.radians(lim[0]), math.radians(lim[1]))
+            for joint, lim in self.joint_limits_degrees.items()
+        }
+
+        self.transform = {
+            "joint1": (-1, 0),
+            "joint2": (1, 1.55),
+            "joint3": (1, -1.63),
+            "joint4": (-1, 0),
+            "joint5": (1, 0),
+            "joint6": (-1, 0),
+            "joint7": (-1, 0),  
+        }
+
 
         # Initialize ROS node (anonymous=True to allow multiple launches)
         rospy.init_node(self.node_name, anonymous=True)
@@ -144,6 +171,33 @@ class PiperRobot(Robot):
 
         return observation
 
+    # Convert so102 action to piper action
+    # input action should have .pos removed from the keys
+    def _convert_action(self, action: dict[str, float]) -> dict[str, float]:
+        converted_action = {}
+        for joint, value in action.items():
+            if joint in self.joint_limits:
+                converted_value = value* self.transform[joint][0] + self.transform[joint][1]
+                # so102 joint angles [rad] converted to piper joint angles [rad]
+                min_limit, max_limit = self.joint_limits[joint]
+                # Ensure the value is within the joint limits
+                safe_value = self._ensure_safe_goal_position(converted_value, min_limit, max_limit)
+                converted_action[joint] = safe_value
+            else:
+                raise ValueError(f"Joint {joint} not recognized in limits.")
+        return converted_action
+
+    def _ensure_safe_goal_position(self, value: float, min_limit: float, max_limit: float) -> float:
+        """
+        Ensure the goal position is within the joint limits.
+        If the value is outside the limits, it will be clamped to the nearest limit.
+        """
+        if value < min_limit:
+            return min_limit
+        elif value > max_limit:
+            return max_limit
+        return value
+
     def send_action(self, action):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
@@ -151,16 +205,17 @@ class PiperRobot(Robot):
         # if self.teleop is None:
         #     raise ValueError("Teleoperator not set for the robot")
 
-        goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
-        
+        # goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
+        goal_pos = {key.removesuffix(".pos"): val for key, val in action.items()}
+        converted_action = self._convert_action(goal_pos)
         joint_state_msg = JointState()
-        joint_state_msg.name = list(goal_pos.keys())      # Compliant with ROS JointState
-        joint_state_msg.position = list(goal_pos.values())
+        joint_state_msg.name = list(converted_action.keys())      # Compliant with ROS JointState
+        joint_state_msg.position = list(converted_action.values())
         # joint_state_msg.velocity = [0.0] * len(goal_pos)
         # joint_state_msg.effort = [0.0] * len(goal_pos)
         self.joint_pub.publish(joint_state_msg)
 
-        return {f"{motor}.pos": val for motor, val in goal_pos.items()}
+        return {f"{motor}.pos": val for motor, val in converted_action.items()}
     
     def disconnect(self) -> None:
         if not self.is_connected:
