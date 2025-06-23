@@ -60,7 +60,7 @@ class SO102Leader(Teleoperator):
                 "joint4": Motor(4, "sts3215", MotorNormMode.RADIANS),
                 "joint5": Motor(5, "sts3215", MotorNormMode.RADIANS),
                 "joint6": Motor(6, "sts3215", MotorNormMode.RADIANS),
-                # "joint7": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
+                "joint7": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )
@@ -159,6 +159,7 @@ class SO102Leader(Teleoperator):
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
+        action["joint7.pos"] = action["joint7.pos"]*0.06/100
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return action

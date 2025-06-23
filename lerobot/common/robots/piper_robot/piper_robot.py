@@ -59,20 +59,20 @@ class PiperRobot(Robot):
             "joint7": 0.0,
         }
 
-        self.joint_limits_degrees = {
-            "joint1": (-154, 154),  # Example limits in radians
-            "joint2": (0, 195),
-            "joint3": (-175, 0),
-            "joint4": (-106, 106),
-            "joint5": (-75, 75),
-            "joint6": (-100, 100),
-            "joint7": (0.0, 1.0),  # Example limits for gripper
+        self.joint_limits = {
+            "joint1": (-2.6878, 2.6878),  # Example limits in radians
+            "joint2": (0, 3.403),
+            "joint3": (-3.054, 0),
+            "joint4": (-1.85, 1.85),
+            "joint5": (-1.29, 1.29),
+            "joint6": (-1.745, 1.745),
+            "joint7": (0.0, 0.06),  # Example limits for gripper
         }
 
-        self.joint_limits = {
-            joint: (math.radians(lim[0]), math.radians(lim[1]))
-            for joint, lim in self.joint_limits_degrees.items()
-        }
+        # self.joint_limits = {
+        #     joint: (math.radians(lim[0]), math.radians(lim[1]))
+        #     for joint, lim in self.joint_limits_degrees.items() if joint != "joint7"
+        # }
 
         self.transform = {
             "joint1": (-1, 0),
@@ -81,7 +81,7 @@ class PiperRobot(Robot):
             "joint4": (-1, 0),
             "joint5": (1, 0),
             "joint6": (-1, 0),
-            "joint7": (-1, 0),  
+            "joint7": (1, 0),  
         }
 
 
@@ -176,6 +176,7 @@ class PiperRobot(Robot):
     def _convert_action(self, action: dict[str, float]) -> dict[str, float]:
         converted_action = {}
         for joint, value in action.items():
+            # print(self.joint_limits)
             if joint in self.joint_limits:
                 converted_value = value* self.transform[joint][0] + self.transform[joint][1]
                 # so102 joint angles [rad] converted to piper joint angles [rad]
