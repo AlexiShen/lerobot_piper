@@ -136,10 +136,13 @@ class SO102Leader(Teleoperator):
         logger.info("Calibration saved to {self.calibration_fpath}")
 
     def configure(self) -> None:
-        self.bus.disable_torque()
+        # self.bus.disable_torque()
+        self.bus.enable_torque()
         self.bus.configure_motors()
         for motor in self.bus.motors:
-            self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+            # self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+            self.bus.write("Operating_Mode", motor, OperatingMode.PWM.value)
+        logger.info("motors configed")
 
     def setup_motors(self) -> None:
         # Original implementation:
@@ -163,6 +166,14 @@ class SO102Leader(Teleoperator):
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return action
+    
+    def get_load(self) -> dict[str, float]:
+        start = time.perf_counter()
+        load = self.bus.sync_read("Present_Load")
+        load = {f"{motor}.load": val for motor, val in load.items()}
+        dt_ms = (time.perf_counter() - start) * 1e3
+        logger.debug(f"{self} read load: {dt_ms:.1f}ms")
+        return load
 
     def send_feedback(self, feedback: dict[str, float]) -> None:
         # Sync write to Goal_Position using feedback dict
@@ -172,6 +183,13 @@ class SO102Leader(Teleoperator):
             motor = motor.split(".")[0]
             self.bus.write("Goal_Position", motor, value)
         logger.info(f"{self} sent feedback: {feedback}")
+
+    def send_feedback_test(self, feedback: dict[str, float]) -> None:
+        print(f"Sending feedback: {feedback}")
+        for motor, value in feedback.items():
+            motor = motor.split(".")[0]
+            self.bus.write("Goal_Time", motor, value)
+        logger.info(f"{self} test sent feedback: {feedback}")
 
 
     def disconnect(self) -> None:
