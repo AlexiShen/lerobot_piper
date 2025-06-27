@@ -76,14 +76,14 @@ def teleop_only_loop(
         feedback = {joint: 0 for joint in action.keys()}
         effort= {
             "joint1.effort": 0,
-            "joint2.effort": 1024 + 120,
+            "joint2.effort": -120,
             "joint3.effort": 0,
             "joint4.effort": 0,
             "joint5.effort": 0,
             "joint6.effort": 0,
             "joint7.effort": 0,
                     }
-        teleop.send_feedback_test(effort)
+        teleop.send_feedback_test()
         # teleop.send_feedback(feedback)
 
         if display_data:

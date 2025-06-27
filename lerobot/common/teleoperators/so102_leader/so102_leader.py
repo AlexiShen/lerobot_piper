@@ -30,7 +30,8 @@ from lerobot.common.motors.feetech import (
 from ..teleoperator import Teleoperator
 from .config_so102_leader import SO102LeaderConfig
 
-import pinocchio as pin
+from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,13 @@ class SO102Leader(Teleoperator):
         else:
             config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
+        urdf_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        urdf_path = urdf_dir / "so102_description.urdf"
+        self.builder = DiagramBuilder()
+        self.plant = MultibodyPlant(time_step=0.0)
+        model_instance = Parser.AddModelFromFile("so102.urdf")
+        self.plant.Finalize()
+        self.context = self.plant.CreateDefaultContext()
         self.config = config
         self.bus = FeetechMotorsBus(
             port=self.config.port,
@@ -136,8 +144,8 @@ class SO102Leader(Teleoperator):
         logger.info("Calibration saved to {self.calibration_fpath}")
 
     def configure(self) -> None:
-        # self.bus.disable_torque()
-        self.bus.enable_torque()
+        self.bus.disable_torque()
+        # self.bus.enable_torque()
         self.bus.configure_motors()
         for motor in self.bus.motors:
             # self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
@@ -167,6 +175,16 @@ class SO102Leader(Teleoperator):
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return action
     
+    def get_velocity(self) -> dict[str, float]:
+        start = time.perf_counter()
+        velocity = self.bus.sync_read("Present_Velocity")
+        velocity = {f"{motor}.vel": val for motor, val in velocity.items()}
+        velocity["joint7.vel"] = 0
+        dt_ms = (time.perf_counter() - start) * 1e3
+        logger.debug(f"{self} read action: {dt_ms:.1f}ms")
+        return velocity
+
+    
     def get_load(self) -> dict[str, float]:
         start = time.perf_counter()
         load = self.bus.sync_read("Present_Load")
@@ -178,18 +196,53 @@ class SO102Leader(Teleoperator):
     def send_feedback(self, feedback: dict[str, float]) -> None:
         # Sync write to Goal_Position using feedback dict
         # feedback keys may be like 'shoulder_pan.pos', so strip '.pos' if present
+        #TODO: replace implmentation with force loop
         print(f"Sending feedback: {feedback}")
         for motor, value in feedback.items():
             motor = motor.split(".")[0]
             self.bus.write("Goal_Position", motor, value)
         logger.info(f"{self} sent feedback: {feedback}")
 
-    def send_feedback_test(self, feedback: dict[str, float]) -> None:
-        print(f"Sending feedback: {feedback}")
-        for motor, value in feedback.items():
-            motor = motor.split(".")[0]
-            self.bus.write("Goal_Time", motor, value)
-        logger.info(f"{self} test sent feedback: {feedback}")
+    # def send_feedback_test(self, feedback: dict[str, float]) -> None:
+    #     print(f"Sending feedback: {feedback}")
+    #     for motor, value in feedback.items():
+    #         motor = motor.split(".")[0]
+    #         self.bus.write("Goal_Time", motor, value)
+    #     logger.info(f"{self} test sent feedback: {feedback}")
+    def send_feedback_test(self, feedback):
+        tau = self._calculate_force_output()
+        tau = np.append(tau, 0)
+        tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
+        print("Tau table:", tau_dict)
+
+    def _calculate_force_output(self):
+        action = self.get_action()
+        velocity = self.get_velocity()
+        q = np.array(list(action.values()))
+        q_dot = np.array(list(velocity.values()))
+        self.plant.SetPositions(self.context, q)
+        self.plant.SetVelocities(self.context, q_dot)
+        frame = self.plant.GetFrameByName("link6")
+        J = self.plant.CalcJacobianSpatialVelocity(
+        self.context,
+        JacobianWrtVariable.kV,
+        frame,
+        [0, 0, 0],
+        self.plant.world_frame(),
+        self.plant.world_frame()
+    )
+        q_rest = np.zeros_like(q)
+        Knp = np.ones_like(q)
+        Knd = 0.1 * np.ones_like(q)
+        tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
+        return tau_null
+
+    @staticmethod
+    def _compute_tau_null(J, q, q_dot, q_rest, Knp, Knd):
+        J_pinv = np.linalg.pinv(J)
+        N = np.eye(J.shape[1]) - J_pinv @ J
+        u = -Knp * (q - q_rest) - Knd * q_dot
+        return N @ u
 
 
     def disconnect(self) -> None:

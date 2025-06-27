@@ -98,6 +98,16 @@ def teleop_loop(
         #             rr.log(f"action_{act}", rr.Scalars(val))
 
         action_sent = robot.send_action(action)
+        effort= {
+            "joint1.effort": 0,
+            "joint2.effort": -0,
+            "joint3.effort": 0,
+            "joint4.effort": 0,
+            "joint5.effort": 0,
+            "joint6.effort": 0,
+            "joint7.effort": 0,
+                    }
+        teleop.send_feedback_test(effort)
         # zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
         # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
         # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
