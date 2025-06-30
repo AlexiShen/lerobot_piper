@@ -1,0 +1,370 @@
+<sdf version='1.11'>
+  <model name='Leader_arm_links.SLDASM'>
+    <link name='base_link'>
+      <inertial>
+        <pose>-0.02486 -3.8183999999999998e-07 0.032740999999999999 0 0 0</pose>
+        <mass>0.21831999999999999</mass>
+        <inertia>
+          <ixx>0.00019440000000000001</ixx>
+          <ixy>4.9999999999999998e-07</ixy>
+          <ixz>-6.4999999999999996e-06</ixz>
+          <iyy>0.00020129999999999999</iyy>
+          <iyz>-2.9999999999999999e-07</iyz>
+          <izz>0.00020000000000000001</izz>
+        </inertia>
+      </inertial>
+      <collision name='base_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/base_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='base_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint1' type='revolute'>
+      <pose relative_to='base_link'>0 0 0 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>link1</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <lower>-2.0600000000000001</lower>
+          <upper>2.0600000000000001</upper>
+          <effort>100</effort>
+          <velocity>5</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link1'>
+      <pose relative_to='joint1'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.011134 -5.5999999999999999e-05 0.017048000000000001 0 0 0</pose>
+        <mass>0.15375</mass>
+        <inertia>
+          <ixx>0.00014965000000000001</ixx>
+          <ixy>1.6e-07</ixy>
+          <ixz>-5.0850000000000003e-05</ixz>
+          <iyy>0.00017708000000000001</iyy>
+          <iyz>-1.3e-07</iyz>
+          <izz>6.4919999999999995e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='link1_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link1.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link1_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link1.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint2' type='revolute'>
+      <pose relative_to='link1'>0 0 0.053999999999999999 -1.5794999999999999 0 -3.1415853071795872</pose>
+      <parent>link1</parent>
+      <child>link2</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1.8400000000000001</lower>
+          <upper>1.8400000000000001</upper>
+          <effort>100</effort>
+          <velocity>5</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link2'>
+      <pose relative_to='joint2'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.0038501999999999998 0.1179 4.1360999999999999e-05 0 0 0</pose>
+        <mass>0.24721000000000001</mass>
+        <inertia>
+          <ixx>0.0010353199999999999</ixx>
+          <ixy>-6.3979999999999994e-05</ixy>
+          <ixz>2.2999999999999999e-07</ixz>
+          <iyy>9.9549999999999994e-05</iyy>
+          <iyz>-1.8199999999999999e-06</iyz>
+          <izz>0.00099653000000000003</izz>
+        </inertia>
+      </inertial>
+      <collision name='link2_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link2.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link2_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link2.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint3' type='revolute'>
+      <pose relative_to='link2'>-0.028000000000000001 0.18386 -0.00059999999999999995 0 0 -3.1415853071795872</pose>
+      <parent>link2</parent>
+      <child>link3</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1.8400000000000001</lower>
+          <upper>1.8400000000000001</upper>
+          <effort>100</effort>
+          <velocity>5</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link3'>
+      <pose relative_to='joint3'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.066039 -0.00011194 0.0083371999999999995 0 0 0</pose>
+        <mass>0.14677000000000001</mass>
+        <inertia>
+          <ixx>5.6096e-05</ixx>
+          <ixy>3.1133999999999998e-07</ixy>
+          <ixz>-3.0937000000000001e-06</ixz>
+          <iyy>0.00010888</iyy>
+          <iyz>-5.7790999999999998e-08</iyz>
+          <izz>6.9058000000000002e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='link3_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link3.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link3_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link3.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint4' type='revolute'>
+      <pose relative_to='link3'>0.10556 0 0.0011000000000000001 3.1415926535897931 1.5707926536359933 3.1415926535897931</pose>
+      <parent>link3</parent>
+      <child>link4</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <lower>-1.7450000000000001</lower>
+          <upper>1.7450000000000001</upper>
+          <effort>100</effort>
+          <velocity>5</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link4'>
+      <pose relative_to='joint4'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.00092940999999999998 0.0014138 0.036212000000000001 0 0 0</pose>
+        <mass>0.11323999999999999</mass>
+        <inertia>
+          <ixx>2.1146999999999999e-05</ixx>
+          <ixy>5.3720000000000001e-08</ixy>
+          <ixz>-2.0875000000000001e-07</ixz>
+          <iyy>2.5874999999999999e-05</iyy>
+          <iyz>-8.5152000000000004e-07</iyz>
+          <izz>1.9766e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='link4_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link4.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link4_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link4.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint5' type='revolute'>
+      <pose relative_to='link4'>0.0016000000000000001 -0.0001 0.059200000000000003 7.3464102064341006e-06 -1.5707926536057681 -3.1415926535897931</pose>
+      <parent>link4</parent>
+      <child>link5</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1.22</lower>
+          <upper>1.22</upper>
+          <effort>100</effort>
+          <velocity>5</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link5'>
+      <pose relative_to='joint5'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.037546000000000003 -0.00022673999999999999 0.0097088999999999995 0 0 0</pose>
+        <mass>0.10193000000000001</mass>
+        <inertia>
+          <ixx>2.9356000000000002e-05</ixx>
+          <ixy>1.2027e-07</ixy>
+          <ixz>-1.9443000000000002e-06</ixz>
+          <iyy>3.5834000000000003e-05</iyy>
+          <iyz>2.1004000000000001e-08</iyz>
+          <izz>1.8482999999999999e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='link5_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link5.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link5_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link5.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='joint6' type='revolute'>
+      <pose relative_to='link5'>0.061500000000001297 0 0 0.0021237791459597409 1.5707963267948966 0</pose>
+      <parent>link5</parent>
+      <child>link6</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-2.0943999999999998</lower>
+          <upper>2.0943999999999998</upper>
+          <effort>100</effort>
+          <velocity>3</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='link6'>
+      <pose relative_to='joint6'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.00083880000000000001 0.016643000000000002 0.039906999999999998 0 0 0</pose>
+        <mass>0.19203999999999999</mass>
+        <inertia>
+          <ixx>8.0488000000000006e-05</ixx>
+          <ixy>-4.6544000000000002e-07</ixy>
+          <ixz>-1.2739e-06</ixz>
+          <iyy>3.6704e-05</iyy>
+          <iyz>-1.7085999999999999e-05</iyz>
+          <izz>6.9842e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='link6_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link6.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='link6_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link6.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.941174984 0.941174984 0.941174984 1</diffuse>
+          <ambient>0.941174984 0.941174984 0.941174984 1</ambient>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

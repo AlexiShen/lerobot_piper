@@ -33,7 +33,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/base_link.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/base_link.STL" />
       </geometry>
       <material
         name="">
@@ -47,7 +47,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/base_link.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/base_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -80,7 +80,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link1.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link1.STL" />
       </geometry>
       <material
         name="">
@@ -94,7 +94,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link1.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link1.STL" />
       </geometry>
     </collision>
   </link>
@@ -148,7 +148,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link2.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link2.STL" />
       </geometry>
       <material
         name="">
@@ -162,7 +162,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link2.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link2.STL" />
       </geometry>
     </collision>
   </link>
@@ -180,7 +180,7 @@
     <child
       link="link2" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="-1.84"
       upper="1.84"
@@ -209,7 +209,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link3.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link3.STL" />
       </geometry>
       <material
         name="">
@@ -223,7 +223,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link3.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link3.STL" />
       </geometry>
     </collision>
   </link>
@@ -238,7 +238,7 @@
     <child
       link="link3" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="-1.84"
       upper="1.84"
@@ -267,7 +267,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link4.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link4.STL" />
       </geometry>
       <material
         name="">
@@ -281,7 +281,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link4.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link4.STL" />
       </geometry>
     </collision>
   </link>
@@ -325,7 +325,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link5.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link5.STL" />
       </geometry>
       <material
         name="">
@@ -339,7 +339,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link5.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link5.STL" />
       </geometry>
     </collision>
   </link>
@@ -383,7 +383,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link6.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link6.STL" />
       </geometry>
       <material
         name="">
@@ -397,7 +397,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/meshes/link6.STL" />
+          filename="package://Leader_arm_links.SLDASM/meshes/link6.STL" />
       </geometry>
     </collision>
   </link>

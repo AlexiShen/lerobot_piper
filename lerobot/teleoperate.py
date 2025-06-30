@@ -100,7 +100,7 @@ def teleop_loop(
         action_sent = robot.send_action(action)
         effort= {
             "joint1.effort": 0,
-            "joint2.effort": -0,
+            "joint2.effort": -128,
             "joint3.effort": 0,
             "joint4.effort": 0,
             "joint5.effort": 0,

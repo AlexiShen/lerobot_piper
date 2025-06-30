@@ -30,7 +30,8 @@ from lerobot.common.motors.feetech import (
 from ..teleoperator import Teleoperator
 from .config_so102_leader import SO102LeaderConfig
 
-from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
+# from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
+import pinocchio as pin
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -52,12 +53,14 @@ class SO102Leader(Teleoperator):
             config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
         urdf_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-        urdf_path = urdf_dir / "so102_description.urdf"
-        self.builder = DiagramBuilder()
-        self.plant = MultibodyPlant(time_step=0.0)
-        model_instance = Parser.AddModelFromFile("so102.urdf")
-        self.plant.Finalize()
-        self.context = self.plant.CreateDefaultContext()
+        urdf_path = urdf_dir / "Leader_arm_links.SLDASM/urdf"#"so102_description.urdf"
+        # self.builder = DiagramBuilder()
+        # self.plant = MultibodyPlant(time_step=0.0)
+        # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM_old_convention.urdf")
+        # self.plant.Finalize()
+        # self.context = self.plant.CreateDefaultContext()
+        self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM.urdf")
+        self.data = self.model.createData()
         self.config = config
         self.bus = FeetechMotorsBus(
             port=self.config.port,
@@ -208,34 +211,88 @@ class SO102Leader(Teleoperator):
     #     for motor, value in feedback.items():
     #         motor = motor.split(".")[0]
     #         self.bus.write("Goal_Time", motor, value)
-    #     logger.info(f"{self} test sent feedback: {feedback}")
+    #     # logger.info(f"{self} test sent feedback: {feedback}")
+
     def send_feedback_test(self, feedback):
         tau = self._calculate_force_output()
         tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
-        print("Tau table:", tau_dict)
+        # print("Tau table:", tau_dict)
+        for motor, value in tau_dict.items():
+            motor = motor.split(".")[0]
+            pwm_int = np.round(value * -100).astype(int)
+            self.bus.write("Goal_Time", motor, pwm_int)
+        # logger.info(f"{self} test sent feedback: {feedback}")
 
+    # def _calculate_force_output(self):
+    #     action = self.get_action()
+    #     velocity = self.get_velocity()
+    #     # q = np.array(list(action.values()))
+    #     # q_dot = np.array(list(velocity.values()))
+    #     keys = list(self.bus.motors.keys())[:-1]  # All except last
+    #     # q = np.array([action[f"{joint}.pos"] for joint in keys])
+    #     # q_dot = np.array([velocity[f"{joint}.vel"] for joint in keys])
+    #     q = np.array([0.1, 0, 0, 0, 0, 0])
+    #     q_dot = np.zeros(6)
+
+
+    #     # self.plant.SetPositions(self.context, q)
+    #     # self.plant.SetVelocities(self.context, q_dot)
+    #     # frame = self.plant.GetFrameByName("link6")
+    #     # J = self.plant.CalcJacobianSpatialVelocity(
+    #     # self.context,
+    #     # JacobianWrtVariable.kV,
+    #     # frame,
+    #     # [0, 0, 0],
+    #     # self.plant.world_frame(),
+    #     # self.plant.world_frame()
+    #     # )
+    #     # q_rest = np.zeros_like(q)
+    #     # Knp = np.ones_like(q)
+    #     # Knd = 0.1 * np.ones_like(q)
+    #     # tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
+    #     # return tau_null
+
+    #     self.model.gravity = pin.Motion.Zero()
+    #     pin.forwardKinematics(self.model, self.data, q, q_dot)
+    #     pin.computeJointJacobians(self.model, self.data, q)
+
+    #     frame_id = self.model.getFrameId("link6")
+    #     J = pin.getFrameJacobian(self.model, self.data, frame_id, pin.LOCAL_WORLD_ALIGNED)
+    #     print("Jacobian rank:", np.linalg.matrix_rank(J))
+
+    #     q_rest = np.zeros_like(q)
+    #     Knp = np.ones_like(q)
+    #     Knd = 0.1 * np.ones_like(q)
+
+    #     tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
+    #     return tau_null
+    
     def _calculate_force_output(self):
         action = self.get_action()
         velocity = self.get_velocity()
-        q = np.array(list(action.values()))
-        q_dot = np.array(list(velocity.values()))
-        self.plant.SetPositions(self.context, q)
-        self.plant.SetVelocities(self.context, q_dot)
-        frame = self.plant.GetFrameByName("link6")
-        J = self.plant.CalcJacobianSpatialVelocity(
-        self.context,
-        JacobianWrtVariable.kV,
-        frame,
-        [0, 0, 0],
-        self.plant.world_frame(),
-        self.plant.world_frame()
-    )
-        q_rest = np.zeros_like(q)
-        Knp = np.ones_like(q)
-        Knd = 0.1 * np.ones_like(q)
-        tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
-        return tau_null
+
+        # Build q and q_dot in correct order
+        valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+        q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
+        q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
+
+        # Gravity compensation
+        tau_g_full = pin.rnea(self.model, self.data, q, q_dot * 0, q_dot * 0)
+
+        tau_g = np.zeros_like(tau_g_full)
+        tau_g[1] = tau_g_full[1]
+        tau_g[2] = tau_g_full[2]
+        tau_g[4] = tau_g_full[4]
+
+        # # Package result
+        # tau_table = {
+        #     f"{joint}.tau": tau_g[i] for i, joint in enumerate(valid_joints)
+        # }
+        # tau_table["joint7.tau"] = 0.0  # Assuming prismatic gripper gets 0 torque
+
+        # print("Tau table:", tau_table)
+        return tau_g
 
     @staticmethod
     def _compute_tau_null(J, q, q_dot, q_rest, Knp, Knd):

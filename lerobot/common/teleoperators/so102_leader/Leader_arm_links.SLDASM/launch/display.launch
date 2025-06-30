@@ -3,7 +3,8 @@
     name="model" />
   <param
     name="robot_description"
-    textfile="$(find Leader_arm_links.SLDASM)/urdf/Leader_arm_links.SLDASM.urdf" />
+    command="cat /home/yfx/lerobot_piper/lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM.urdf"/>
+    <!-- textfile="$(find Leader_arm_links.SLDASM)/urdf/Leader_arm_links.SLDASM.urdf" /> -->
   <node
     name="joint_state_publisher_gui"
     pkg="joint_state_publisher_gui"
@@ -16,5 +17,7 @@
     name="rviz"
     pkg="rviz"
     type="rviz"
-    args="-d $(find Leader_arm_links.SLDASM)/urdf.rviz" />
+        />
+    <!-- args="-d $(find Leader_arm_links.SLDASM)/urdf.rviz" -->
+
 </launch>
