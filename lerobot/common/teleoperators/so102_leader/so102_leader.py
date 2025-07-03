@@ -151,8 +151,10 @@ class SO102Leader(Teleoperator):
         # self.bus.enable_torque()
         self.bus.configure_motors()
         for motor in self.bus.motors:
-            # self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
-            self.bus.write("Operating_Mode", motor, OperatingMode.PWM.value)
+            if motor == "joint7":
+                self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+            else:
+                self.bus.write("Operating_Mode", motor, OperatingMode.PWM.value)
         logger.info("motors configed")
 
     def setup_motors(self) -> None:
@@ -278,10 +280,11 @@ class SO102Leader(Teleoperator):
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
 
         # Gravity compensation
-        tau_g_full = pin.rnea(self.model, self.data, q, q_dot * 0, q_dot * 0)
+        tau_g_full = pin.rnea(self.model, self.data, q, q_dot, q_dot*0)
 
         tau_g = np.zeros_like(tau_g_full)
         tau_g[1] = tau_g_full[1]
+        tau_g[1] = tau_g[1] * 1
         tau_g[2] = tau_g_full[2]
         tau_g[4] = tau_g_full[4]
 
