@@ -782,6 +782,7 @@ class MotorsBus(abc.ABC):
             motor = self._id_to_name(id_)
             min_ = self.calibration[motor].range_min
             max_ = self.calibration[motor].range_max
+            offset = self.calibration[motor].homing_offset
             drive_mode = self.apply_drive_mode and self.calibration[motor].drive_mode
             if max_ == min_:
                 raise ValueError(f"Invalid calibration for motor '{motor}': min and max are equal.")
@@ -800,7 +801,8 @@ class MotorsBus(abc.ABC):
             elif self.motors[motor].norm_mode is MotorNormMode.RADIANS:
                 mid = (min_ + max_) / 2
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
-                normalized_values[id_] = (val - mid) * (2 * 3.1415) / max_res
+                normalized_values[id_] = ((val - offset)%4096 - mid) * 2 * 3.1415 / (max_ - min_)
+                # normalized_values[id_] = mid
             else:
                 raise NotImplementedError
 
