@@ -32,6 +32,7 @@ from .config_so102_leader import SO102LeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
+from pinocchio.utils import rotate
 from pinocchio.visualize import MeshcatVisualizer
 import meshcat
 from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
@@ -70,9 +71,9 @@ class SO102Leader(Teleoperator):
         self.config = config
 
         # Set up Meshcat viewer
-        # self.vis = MeshcatVisualizer(self.model, pin.GeometryModel(), pin.GeometryModel(), meshcat.Visualizer())
-        # self.vis.initViewer(open=True)
-        # self.vis.loadViewerModel()
+        self.vis = MeshcatVisualizer(self.model, pin.GeometryModel(), pin.GeometryModel(), meshcat.Visualizer())
+        self.vis.initViewer(open=True)
+        self.vis.loadViewerModel()
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
@@ -191,7 +192,7 @@ class SO102Leader(Teleoperator):
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
-        # self._visualize_joint_origins(q)
+        self._visualize_joint_origins(q)
         # self._print_joint_model_info()
         return action
     
@@ -361,7 +362,7 @@ class SO102Leader(Teleoperator):
                 pin.SE3(np.eye(3), com_world).homogeneous
             )
 
-            # self.draw_z_axis(jname, placement)
+            self.draw_z_axis(jname, placement)
 
                     
         # print("Visualization running. Open Meshcat in your browser to inspect.")
@@ -373,7 +374,10 @@ class SO102Leader(Teleoperator):
             MeshLambertMaterial(color=0x0000ff)
         )
         # Transform so it starts at origin and points along Z
-        T = placement * pin.SE3(np.eye(3), np.array([0, 0, length / 2]))
+        R = rotate('x', -np.pi/2)
+        t = np.zeros(3)
+        T_comp = pin.SE3(R, t)
+        T = placement * T_comp#* pin.SE3(np.eye(3), np.array([0, 0, length / 2]))
         self.vis.viewer[f"z_axis/{name}"].set_transform(T.homogeneous)
 
     @staticmethod
