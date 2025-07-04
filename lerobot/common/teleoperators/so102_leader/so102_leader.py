@@ -71,9 +71,11 @@ class SO102Leader(Teleoperator):
         self.config = config
 
         # Set up Meshcat viewer
-        self.vis = MeshcatVisualizer(self.model, pin.GeometryModel(), pin.GeometryModel(), meshcat.Visualizer())
-        self.vis.initViewer(open=True)
-        self.vis.loadViewerModel()
+        self.vis = None
+        # self.vis = MeshcatVisualizer(self.model, pin.GeometryModel(), pin.GeometryModel(), meshcat.Visualizer())
+        # self.vis.initViewer(open=True)
+        # self.vis.loadViewerModel()
+
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
@@ -187,12 +189,14 @@ class SO102Leader(Teleoperator):
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
-        # action["joint7.pos"] = action["joint7.pos"]*0.06/100
+        action["joint7.pos"] = action["joint7.pos"]*0.06/100
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
-        self._visualize_joint_origins(q)
+
+        if self.vis is not None:
+            self._visualize_joint_origins(q)
         # self._print_joint_model_info()
         return action
     
