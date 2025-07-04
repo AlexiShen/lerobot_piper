@@ -32,6 +32,11 @@ from .config_so102_leader import SO102LeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
+from pinocchio.visualize import MeshcatVisualizer
+import meshcat
+from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
+import scipy.spatial.transform
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -60,8 +65,14 @@ class SO102Leader(Teleoperator):
         # self.plant.Finalize()
         # self.context = self.plant.CreateDefaultContext()
         self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM.urdf")
+        # self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/so102_description.urdf")
         self.data = self.model.createData()
         self.config = config
+
+        # Set up Meshcat viewer
+        # self.vis = MeshcatVisualizer(self.model, pin.GeometryModel(), pin.GeometryModel(), meshcat.Visualizer())
+        # self.vis.initViewer(open=True)
+        # self.vis.loadViewerModel()
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
@@ -175,9 +186,13 @@ class SO102Leader(Teleoperator):
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
-        action["joint7.pos"] = action["joint7.pos"]*0.06/100
+        # action["joint7.pos"] = action["joint7.pos"]*0.06/100
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
+        valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+        q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
+        # self._visualize_joint_origins(q)
+        # self._print_joint_model_info()
         return action
     
     def get_velocity(self) -> dict[str, float]:
@@ -206,7 +221,7 @@ class SO102Leader(Teleoperator):
         for motor, value in feedback.items():
             motor = motor.split(".")[0]
             self.bus.write("Goal_Position", motor, value)
-        logger.info(f"{self} sent feedback: {feedback}")
+        # logger.info(f"{self} sent feedback: {feedback}")
 
     # def send_feedback_test(self, feedback: dict[str, float]) -> None:
     #     print(f"Sending feedback: {feedback}")
@@ -222,9 +237,16 @@ class SO102Leader(Teleoperator):
         # print("Tau table:", tau_dict)
         for motor, value in tau_dict.items():
             motor = motor.split(".")[0]
-            pwm_int = np.round(value * -100).astype(int)
+            pwm_int = np.round(value * 100).astype(int)
             self.bus.write("Goal_Time", motor, pwm_int)
         # logger.info(f"{self} test sent feedback: {feedback}")
+        # print("CoM:", self.model.inertias[2].lever)
+
+    def _print_joint_model_info(self):
+        for jname in self.model.names[1:]:
+            j_id = self.model.getJointId(jname)
+            joint = self.model.joints[j_id]
+            print(f"{jname}: axis = {joint.axis}, placement translation = {joint.placement.translation}")
 
     # def _calculate_force_output(self):
     #     action = self.get_action()
@@ -279,14 +301,17 @@ class SO102Leader(Teleoperator):
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
 
+        # pin.forwardKinematics(self.model, self.data, q)
+        # joint2_id = self.model.getJointId("joint2")
+
         # Gravity compensation
         tau_g_full = pin.rnea(self.model, self.data, q, q_dot, q_dot*0)
 
         tau_g = np.zeros_like(tau_g_full)
-        tau_g[1] = tau_g_full[1]
-        tau_g[1] = tau_g[1] * 1
-        tau_g[2] = tau_g_full[2]
-        tau_g[4] = tau_g_full[4]
+        tau_g[1] = -tau_g_full[1]
+        # tau_g[1] = tau_g[1]
+        tau_g[2] = -tau_g_full[2]
+        tau_g[4] = -tau_g_full[4]
 
         # # Package result
         # tau_table = {
@@ -296,6 +321,60 @@ class SO102Leader(Teleoperator):
 
         # print("Tau table:", tau_table)
         return tau_g
+    
+
+    def _visualize_joint_origins(self, q=None):
+        """
+        Visualize joint origins and frames using Meshcat.
+        If q is None, use zero configuration.
+        """
+        if q is None:
+            q = np.zeros(self.model.nq)
+
+        # Compute FK
+        pin.forwardKinematics(self.model, self.data, q)
+        pin.updateFramePlacements(self.model, self.data)
+
+        # Display frames and markers
+        for jname in self.model.names[1:]:
+            j_id = self.model.getJointId(jname)
+            placement = self.data.oMi[j_id]
+            joint = self.model.joints[j_id]
+            
+            # Set transform for the frame
+            self.vis.viewer[jname].set_transform(placement.homogeneous)
+            # self.draw_axis(jname + "/axes")
+
+            # Add marker at joint origin
+            self.vis.viewer[f"{jname}_marker"].set_object(Sphere(0.01), MeshLambertMaterial(color=0xff0000))
+            self.vis.viewer[f"{jname}_marker"].set_transform(placement.homogeneous)
+
+            # Compute CoM position in world frame
+            inertia = self.model.inertias[j_id]
+            com_world = placement.act(inertia.lever)
+
+            # Add CoM marker
+            self.vis.viewer[f"com/{jname}"].set_object(
+                Sphere(0.008), MeshLambertMaterial(color=0x00ffff)  # cyan CoM
+            )
+            self.vis.viewer[f"com/{jname}"].set_transform(
+                pin.SE3(np.eye(3), com_world).homogeneous
+            )
+
+            # self.draw_z_axis(jname, placement)
+
+                    
+        # print("Visualization running. Open Meshcat in your browser to inspect.")
+    
+    def draw_z_axis(self, name, placement, length=0.05, radius=0.001):
+        # Draw Z axis (blue cylinder pointing along local Z)
+        self.vis.viewer[f"z_axis/{name}"].set_object(
+            Cylinder(length, radius),
+            MeshLambertMaterial(color=0x0000ff)
+        )
+        # Transform so it starts at origin and points along Z
+        T = placement * pin.SE3(np.eye(3), np.array([0, 0, length / 2]))
+        self.vis.viewer[f"z_axis/{name}"].set_transform(T.homogeneous)
 
     @staticmethod
     def _compute_tau_null(J, q, q_dot, q_rest, Knp, Knd):

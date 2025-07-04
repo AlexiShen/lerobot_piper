@@ -12,20 +12,20 @@
         rpy="0 0 0" />
       <mass
         value="0.21832" />
-      <!-- <inertia
+      <inertia
         ixx="0.00015193"
         ixy="-5.2172E-07"
         ixz="2.1784E-05"
         iyy="0.00014266"
         iyz="-1.8991E-09"
-        izz="0.00018377" /> -->
-      <inertia 
+        izz="0.00018377" />
+      <!-- <inertia 
         ixx="0.0001944" 
         ixy="0.0000005" 
         ixz="-0.0000065" 
         iyy="0.0002013" 
         iyz="-0.0000003" 
-        izz="0.0002000" />
+        izz="0.0002000" /> -->
     </inertial>
     <visual>
       <origin
@@ -57,8 +57,9 @@
       <origin
         xyz="0.011134 -5.6E-05 0.017048"
         rpy="0 0 0" />
-      <mass
-        value="0.15375" />
+      <!-- <mass
+        value="0.15375" /> -->
+      <mass value="0.093"/>
       <!-- <inertia
         ixx="6.163E-05"
         ixy="-2.4039E-07"
@@ -112,7 +113,7 @@
     <child
       link="link1" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
     <limit
       lower="-2.06"
       upper="2.06"
@@ -174,7 +175,7 @@
       rpy="1.5795 0 3.1416" /> -->
     <origin
       xyz="0 0 0.054"
-      rpy="-1.5795 0 3.1416" />
+      rpy="-1.5795 3.1416 3.1416" />
     <parent
       link="link1" />
     <child
@@ -195,6 +196,7 @@
         rpy="0 0 0" />
       <mass
         value="0.14677" />
+        <!-- <mass value="0" /> -->
       <inertia
         ixx="5.6096E-05"
         ixy="3.1134E-07"
@@ -253,6 +255,7 @@
         rpy="0 0 0" />
       <mass
         value="0.11324" />
+      <!-- <mass value="0" /> -->
       <inertia
         ixx="2.1147E-05"
         ixy="5.372E-08"
@@ -296,7 +299,7 @@
     <child
       link="link4" />
     <axis
-      xyz="0 0 -1" />
+      xyz="0 0 1" />
     <limit
       lower="-1.745"
       upper="1.745"
@@ -311,6 +314,7 @@
         rpy="0 0 0" />
       <mass
         value="0.10193" />
+      <!-- <mass value="0" /> -->
       <inertia
         ixx="2.9356E-05"
         ixy="1.2027E-07"
@@ -348,7 +352,7 @@
     type="revolute">
     <origin
       xyz="0.0016 -0.0001 0.0592"
-      rpy="3.1416 -1.5708 0" />
+      rpy="0 -1.5708 0" />
     <parent
       link="link4" />
     <child
@@ -369,6 +373,7 @@
         rpy="0 0 0" />
       <mass
         value="0.19204" />
+      <!-- <mass value="0" /> -->
       <inertia
         ixx="8.0488E-05"
         ixy="-4.6544E-07"
