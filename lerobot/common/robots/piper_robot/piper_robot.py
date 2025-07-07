@@ -63,8 +63,8 @@ class PiperRobot(Robot):
             "joint1": (-2.6878, 2.6878),  # Example limits in radians
             "joint2": (0, 3.403),
             "joint3": (-3.054, 0),
-            "joint4": (-1.85, 1.85),
-            "joint5": (-1.29, 1.29),
+            "joint4": (-1.84, 1.84),
+            "joint5": (-1.28, 1.28),
             "joint6": (-1.745, 1.745),
             "joint7": (0.0, 0.06),  # Example limits for gripper
         }

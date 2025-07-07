@@ -76,6 +76,8 @@ class SO102Leader(Teleoperator):
         # self.vis.initViewer(open=True)
         # self.vis.loadViewerModel()
 
+        self.t_static = time.perf_counter()
+
         self.bus = FeetechMotorsBus(
             port=self.config.port,
             motors={
@@ -317,15 +319,18 @@ class SO102Leader(Teleoperator):
         # tau_g[1] = tau_g[1]
         tau_g[2] = -tau_g_full[2]
         tau_g[4] = -tau_g_full[4]
-
-        # # Package result
-        # tau_table = {
-        #     f"{joint}.tau": tau_g[i] for i, joint in enumerate(valid_joints)
-        # }
-        # tau_table["joint7.tau"] = 0.0  # Assuming prismatic gripper gets 0 torque
-
-        # print("Tau table:", tau_table)
         return tau_g
+    
+    # def _compute_static_friction_compensation(self, q_dot, freq = 500):
+    #     tau_ss = np.zeros_like(q_dot)
+    #     if_increment_time = False
+    #     dt = 0.001
+    #     q_threshold = 
+    #     for i, qd in enumerate(q_dot):
+    #         if abs(qd) < 1e-3:
+    #             tau_ss[i] = 0.2 * 
+
+
     
 
     def _visualize_joint_origins(self, q=None):
