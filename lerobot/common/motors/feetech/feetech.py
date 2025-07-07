@@ -37,7 +37,8 @@ DEFAULT_PROTOCOL_VERSION = 0
 DEFAULT_BAUDRATE = 1_000_000
 DEFAULT_TIMEOUT_MS = 1000
 
-NORMALIZED_DATA = ["Goal_Position", "Present_Position"]
+NORMALIZED_DATA = ["Goal_Position", "Present_Position", "Present_Velocity"]
+# NORMALIZED_DATA = []
 
 logger = logging.getLogger(__name__)
 

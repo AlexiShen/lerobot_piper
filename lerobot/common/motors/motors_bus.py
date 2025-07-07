@@ -782,9 +782,16 @@ class MotorsBus(abc.ABC):
             motor = self._id_to_name(id_)
             min_ = self.calibration[motor].range_min
             max_ = self.calibration[motor].range_max
+            offset_ = self.calibration[motor].homing_offset
             drive_mode = self.apply_drive_mode and self.calibration[motor].drive_mode
             if max_ == min_:
                 raise ValueError(f"Invalid calibration for motor '{motor}': min and max are equal.")
+            
+            operating_mode_= self.read("Operating_Mode", motor)
+            if operating_mode_ == 2:
+                max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
+                val = val - offset_
+                val = val%max_res
 
             bounded_val = min(max_, max(min_, val))
             if self.motors[motor].norm_mode is MotorNormMode.RANGE_M100_100:
@@ -800,7 +807,8 @@ class MotorsBus(abc.ABC):
             elif self.motors[motor].norm_mode is MotorNormMode.RADIANS:
                 mid = (min_ + max_) / 2
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
-                normalized_values[id_] = (val - mid) * (2 * 3.1415) / max_res
+                normalized_values[id_] = (val - mid) * 2 * 3.1415 / max_res
+                # normalized_values[id_] = val
             else:
                 raise NotImplementedError
 
@@ -815,9 +823,16 @@ class MotorsBus(abc.ABC):
             motor = self._id_to_name(id_)
             min_ = self.calibration[motor].range_min
             max_ = self.calibration[motor].range_max
+            offset_ = self.calibration[motor].homing_offset
             drive_mode = self.apply_drive_mode and self.calibration[motor].drive_mode
             if max_ == min_:
                 raise ValueError(f"Invalid calibration for motor '{motor}': min and max are equal.")
+            
+            # operating_mode_= self.read("Operating_Mode", motor)
+            # if operating_mode_ == 2:
+            #     max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
+            #     val = val + offset_
+            #     val = val%max_res
 
             if self.motors[motor].norm_mode is MotorNormMode.RANGE_M100_100:
                 val = -val if drive_mode else val
@@ -834,7 +849,7 @@ class MotorsBus(abc.ABC):
             elif self.motors[motor].norm_mode is MotorNormMode.RADIANS:
                 mid = (min_ + max_) / 2
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
-                unnormalized_values[id_] = int((val * max_res / (2 * 3.1415)) + mid)
+                unnormalized_values[id_] = int(((val * max_res / (2 * 3.1415)) + mid) )
             else:
                 raise NotImplementedError
 
