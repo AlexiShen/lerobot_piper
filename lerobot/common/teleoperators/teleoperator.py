@@ -104,7 +104,17 @@ class Teleoperator(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def get_load(self) -> dict[str, Any]:
+        """Gets the load to do whatever you like."""
+        pass
+
+    @abc.abstractmethod
     def send_feedback(self, feedback: dict[str, Any]) -> None:
+        """Sends feedback captured from a robot to the teleoperator."""
+        pass
+
+    @abc.abstractmethod
+    def send_feedback_test(self, feedback: dict[str, Any]) -> None:
         """Sends feedback captured from a robot to the teleoperator."""
         pass
 

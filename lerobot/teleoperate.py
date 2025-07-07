@@ -28,6 +28,8 @@ python -m lerobot.teleoperate \
     --teleop.id=blue \
     --display_data=true
 ```
+
+python -m lerobot.teleoperate --robot.type=piper_robot --teleop.type=so102_leader --teleop.port=/dev/ttyACM0 --teleop.id=right --display_data=false
 """
 
 import logging
@@ -98,6 +100,16 @@ def teleop_loop(
         #             rr.log(f"action_{act}", rr.Scalars(val))
 
         action_sent = robot.send_action(action)
+        effort= {
+            "joint1.effort": 0,
+            "joint2.effort": -90,
+            "joint3.effort": 90,
+            "joint4.effort": 0,
+            "joint5.effort": 100,
+            "joint6.effort": 0,
+            # "joint7.effort": 0,
+                    }
+        teleop.send_feedback_test(effort)
         # zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
         # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
         # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}

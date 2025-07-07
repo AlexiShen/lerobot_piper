@@ -24,6 +24,8 @@ python -m lerobot.teleoperate_only \
     --teleop.id=blue \
     --display_data=true
 ```
+
+python -m lerobot.teleoperate_only --teleop.port=/dev/ttyACM0 --teleop.id=right --display_data=false
 """
 
 import logging
@@ -70,9 +72,20 @@ def teleop_only_loop(
     while True:
         loop_start = time.perf_counter()
         action = teleop.get_action()
+        load = teleop.get_load()
 
         # Send feedback: set each joint to 0
-        # feedback = {joint: 0 for joint in action.keys()}
+        feedback = {joint: 0 for joint in action.keys()}
+        effort= {
+            "joint1.effort": 0,
+            "joint2.effort": -90,
+            "joint3.effort": 90,
+            "joint4.effort": 0,
+            "joint5.effort": 100,
+            "joint6.effort": 0,
+            # "joint7.effort": 0,
+                    }
+        teleop.send_feedback_test(effort)
         # teleop.send_feedback(feedback)
 
         if display_data:
@@ -85,9 +98,10 @@ def teleop_only_loop(
         loop_s = time.perf_counter() - loop_start
 
         print("\n" + "-" * 20)
-        print(f"{'NAME':<10} | {'VALUE':>7}")
-        for motor, value in action.items():
-            print(f"{motor:<10} | {value:>7.2f}")
+        print(f"{'NAME':<10} | {'LOAD':>7} | {'ACTION':>7}")
+        # for motor, value in action.items():
+        for (motor, load_val), (motor2, action_val) in zip(load.items(), action.items()):
+            print(f"{motor:<10} | {load_val:>7.2f} | {action_val:>7.2f}")
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
