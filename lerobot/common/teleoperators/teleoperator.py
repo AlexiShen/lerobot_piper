@@ -119,7 +119,7 @@ class Teleoperator(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def send_feedback_test(self, feedback: dict[str, Any]) -> None:
+    def send_force_feedback(self, feedback: dict[str, Any]) -> None:
         """Sends feedback captured from a robot to the teleoperator."""
         pass
 

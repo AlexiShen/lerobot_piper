@@ -87,10 +87,16 @@ class SO102Leader(Teleoperator):
                 "joint4": Motor(4, "sts3215", MotorNormMode.RADIANS),
                 "joint5": Motor(5, "sts3215", MotorNormMode.RADIANS),
                 "joint6": Motor(6, "sts3215", MotorNormMode.RADIANS),
-                "joint7": Motor(7, "sts3215", MotorNormMode.RANGE_0_100),
+                "joint7": Motor(7, "sts3215", MotorNormMode.RADIANS),
             },
             calibration=self.calibration,
         )
+        trigger_min = self.bus.calibration["joint7"].range_min
+        trigger_max = self.bus.calibration["joint7"].range_max
+        trigger_mid = (trigger_min + trigger_max) / 2
+        max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
+        self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
+                               (trigger_max - trigger_mid)/max_res * 2*np.pi)
 
     @property
     def action_features(self) -> dict[str, type]:
@@ -167,10 +173,10 @@ class SO102Leader(Teleoperator):
         # self.bus.enable_torque()
         self.bus.configure_motors()
         for motor in self.bus.motors:
-            if motor == "joint7":
-                self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
-            else:
-                self.bus.write("Operating_Mode", motor, OperatingMode.PWM.value)
+            # if motor == "joint7":
+            #     self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+            # else:
+            self.bus.write("Operating_Mode", motor, OperatingMode.PWM.value)
         logger.info("motors configed")
 
     def setup_motors(self) -> None:
@@ -191,7 +197,8 @@ class SO102Leader(Teleoperator):
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
-        action["joint7.pos"] = action["joint7.pos"]*0.06/100
+        action["joint7.pos"] = (action["joint7.pos"] - self.trigger_limits[0]) \
+            / (self.trigger_limits[1] - self.trigger_limits[0]) * 0.08
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
@@ -206,7 +213,7 @@ class SO102Leader(Teleoperator):
         start = time.perf_counter()
         velocity = self.bus.sync_read("Present_Velocity")
         velocity = {f"{motor}.vel": val for motor, val in velocity.items()}
-        velocity["joint7.vel"] = 0
+        # velocity["joint7.vel"] = 0
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return velocity
@@ -237,8 +244,8 @@ class SO102Leader(Teleoperator):
     #         self.bus.write("Goal_Time", motor, value)
     #     # logger.info(f"{self} test sent feedback: {feedback}")
 
-    def send_feedback_test(self, feedback):
-        tau = self._calculate_force_output()
+    def send_force_feedback(self, feedback):
+        tau = self._compute_force_output()
         tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
         # print("Tau table:", tau_dict)
@@ -255,51 +262,9 @@ class SO102Leader(Teleoperator):
             joint = self.model.joints[j_id]
             print(f"{jname}: axis = {joint.axis}, placement translation = {joint.placement.translation}")
 
-    # def _calculate_force_output(self):
-    #     action = self.get_action()
-    #     velocity = self.get_velocity()
-    #     # q = np.array(list(action.values()))
-    #     # q_dot = np.array(list(velocity.values()))
-    #     keys = list(self.bus.motors.keys())[:-1]  # All except last
-    #     # q = np.array([action[f"{joint}.pos"] for joint in keys])
-    #     # q_dot = np.array([velocity[f"{joint}.vel"] for joint in keys])
-    #     q = np.array([0.1, 0, 0, 0, 0, 0])
-    #     q_dot = np.zeros(6)
 
 
-    #     # self.plant.SetPositions(self.context, q)
-    #     # self.plant.SetVelocities(self.context, q_dot)
-    #     # frame = self.plant.GetFrameByName("link6")
-    #     # J = self.plant.CalcJacobianSpatialVelocity(
-    #     # self.context,
-    #     # JacobianWrtVariable.kV,
-    #     # frame,
-    #     # [0, 0, 0],
-    #     # self.plant.world_frame(),
-    #     # self.plant.world_frame()
-    #     # )
-    #     # q_rest = np.zeros_like(q)
-    #     # Knp = np.ones_like(q)
-    #     # Knd = 0.1 * np.ones_like(q)
-    #     # tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
-    #     # return tau_null
-
-    #     self.model.gravity = pin.Motion.Zero()
-    #     pin.forwardKinematics(self.model, self.data, q, q_dot)
-    #     pin.computeJointJacobians(self.model, self.data, q)
-
-    #     frame_id = self.model.getFrameId("link6")
-    #     J = pin.getFrameJacobian(self.model, self.data, frame_id, pin.LOCAL_WORLD_ALIGNED)
-    #     print("Jacobian rank:", np.linalg.matrix_rank(J))
-
-    #     q_rest = np.zeros_like(q)
-    #     Knp = np.ones_like(q)
-    #     Knd = 0.1 * np.ones_like(q)
-
-    #     tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
-    #     return tau_null
-    
-    def _calculate_force_output(self):
+    def _compute_force_output(self):
         action = self.get_action()
         velocity = self.get_velocity()
 
@@ -307,11 +272,19 @@ class SO102Leader(Teleoperator):
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
+        q_dot_ee = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
 
         # pin.forwardKinematics(self.model, self.data, q)
         # joint2_id = self.model.getJointId("joint2")
+        tau_g = self._compute_gravity_compensation(q, q_dot)
+        tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
+        tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
 
-        # Gravity compensation
+        tau = tau_vf + tau_ss + tau_g
+        return tau
+
+    # Gravity compensation
+    def _compute_gravity_compensation(self, q, q_dot):
         tau_g_full = pin.rnea(self.model, self.data, q, q_dot, q_dot*0)
 
         tau_g = np.zeros_like(tau_g_full)
@@ -319,19 +292,37 @@ class SO102Leader(Teleoperator):
         # tau_g[1] = tau_g[1]
         tau_g[2] = -tau_g_full[2]
         tau_g[4] = -tau_g_full[4]
+        tau_g = np.append(tau_g, 0)
         return tau_g
-    
-    # def _compute_static_friction_compensation(self, q_dot, freq = 500):
-    #     tau_ss = np.zeros_like(q_dot)
-    #     if_increment_time = False
-    #     dt = 0.001
-    #     q_threshold = 
-    #     for i, qd in enumerate(q_dot):
-    #         if abs(qd) < 1e-3:
-    #             tau_ss[i] = 0.2 * 
 
-
+    def _compute_static_friction_compensation(self, q_dot, freq=500):
+        tau_ss = np.zeros_like(q_dot)
+        if_increment_time = False
+        dt = 0.000001
+        q_threshold = 0.09
+        us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4]
+        for i, qd in enumerate(q_dot):
+            if abs(qd) < q_threshold:
+                if_increment_time = True
+                tau_ss[i] = us[i] * np.cos(np.pi * (time.perf_counter() - self.t_static) * freq)
+            else:
+                tau_ss[i] = 0
+        if if_increment_time:
+            self.t_static += dt
+        else:
+            self.t_static = time.perf_counter()
+        # print(time.perf_counter() - self.t_static)
+        return tau_ss
     
+    def _compute_viscous_friction_compensation(self, q_dot):
+        tau_vf = np.zeros_like(q_dot)
+        q_threshold = 0.09
+        uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
+        uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.7]
+        for i, qd in enumerate(q_dot):
+            if abs(qd) > q_threshold:
+                tau_vf[i] = uc[i] * np.sign(qd) + uv[i] * qd
+        return tau_vf * -1
 
     def _visualize_joint_origins(self, q=None):
         """
@@ -426,3 +417,47 @@ class SO102Leader(Teleoperator):
     #         json.dump(self.calibration, f, indent=4)
 
     #     logger.info(f"Calibration saved to {calibration_path}")
+
+        # def _calculate_force_output(self):
+    #     action = self.get_action()
+    #     velocity = self.get_velocity()
+    #     # q = np.array(list(action.values()))
+    #     # q_dot = np.array(list(velocity.values()))
+    #     keys = list(self.bus.motors.keys())[:-1]  # All except last
+    #     # q = np.array([action[f"{joint}.pos"] for joint in keys])
+    #     # q_dot = np.array([velocity[f"{joint}.vel"] for joint in keys])
+    #     q = np.array([0.1, 0, 0, 0, 0, 0])
+    #     q_dot = np.zeros(6)
+
+
+    #     # self.plant.SetPositions(self.context, q)
+    #     # self.plant.SetVelocities(self.context, q_dot)
+    #     # frame = self.plant.GetFrameByName("link6")
+    #     # J = self.plant.CalcJacobianSpatialVelocity(
+    #     # self.context,
+    #     # JacobianWrtVariable.kV,
+    #     # frame,
+    #     # [0, 0, 0],
+    #     # self.plant.world_frame(),
+    #     # self.plant.world_frame()
+    #     # )
+    #     # q_rest = np.zeros_like(q)
+    #     # Knp = np.ones_like(q)
+    #     # Knd = 0.1 * np.ones_like(q)
+    #     # tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
+    #     # return tau_null
+
+    #     self.model.gravity = pin.Motion.Zero()
+    #     pin.forwardKinematics(self.model, self.data, q, q_dot)
+    #     pin.computeJointJacobians(self.model, self.data, q)
+
+    #     frame_id = self.model.getFrameId("link6")
+    #     J = pin.getFrameJacobian(self.model, self.data, frame_id, pin.LOCAL_WORLD_ALIGNED)
+    #     print("Jacobian rank:", np.linalg.matrix_rank(J))
+
+    #     q_rest = np.zeros_like(q)
+    #     Knp = np.ones_like(q)
+    #     Knd = 0.1 * np.ones_like(q)
+
+    #     tau_null = self._compute_tau_null(J, q, q_dot, q_rest, Knp, Knd)
+    #     return tau_null

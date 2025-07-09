@@ -86,7 +86,7 @@ def teleop_only_loop(
             "joint6.effort": 0,
             # "joint7.effort": 0,
                     }
-        teleop.send_feedback_test(effort)
+        teleop.send_force_feedback(effort)
         # teleop.send_feedback(feedback)
 
         if display_data:

@@ -773,7 +773,7 @@ class MotorsBus(abc.ABC):
 
         return mins, maxes
 
-    def _normalize(self, ids_values: dict[int, int]) -> dict[int, float]:
+    def _normalize(self, ids_values, data_name: dict[int, int]) -> dict[int, float]:
         if not self.calibration:
             raise RuntimeError(f"{self} has no calibration registered.")
 
@@ -786,12 +786,12 @@ class MotorsBus(abc.ABC):
             drive_mode = self.apply_drive_mode and self.calibration[motor].drive_mode
             if max_ == min_:
                 raise ValueError(f"Invalid calibration for motor '{motor}': min and max are equal.")
-            
-            operating_mode_= self.read("Operating_Mode", motor)
-            if operating_mode_ == 2:
+
+            operating_mode_ = self.read("Operating_Mode", motor)
+            if operating_mode_ == 2 and data_name == "Present_Position":
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
                 val = val - offset_
-                val = val%max_res
+                val = val % max_res
 
             bounded_val = min(max_, max(min_, val))
             if self.motors[motor].norm_mode is MotorNormMode.RANGE_M100_100:
@@ -804,10 +804,14 @@ class MotorsBus(abc.ABC):
                 mid = (min_ + max_) / 2
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
                 normalized_values[id_] = (val - mid) * 360 / max_res
-            elif self.motors[motor].norm_mode is MotorNormMode.RADIANS:
+            elif self.motors[motor].norm_mode is MotorNormMode.RADIANS and data_name != "Present_Velocity":
                 mid = (min_ + max_) / 2
                 max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
                 normalized_values[id_] = (val - mid) * 2 * 3.1415 / max_res
+                # normalized_values[id_] = val
+            elif self.motors[motor].norm_mode is MotorNormMode.RADIANS and data_name == "Present_Velocity":
+                max_res = self.model_resolution_table[self._id_to_model(id_)] - 1
+                normalized_values[id_] = (val) * 2 * 3.1415 / max_res
                 # normalized_values[id_] = val
             else:
                 raise NotImplementedError
@@ -971,7 +975,7 @@ class MotorsBus(abc.ABC):
         id_value = self._decode_sign(data_name, {id_: value})
 
         if normalize and data_name in self.normalized_data:
-            id_value = self._normalize(id_value)
+            id_value = self._normalize(id_value, data_name)
 
         return id_value[id_]
 
@@ -1117,7 +1121,7 @@ class MotorsBus(abc.ABC):
         ids_values = self._decode_sign(data_name, ids_values)
 
         if normalize and data_name in self.normalized_data:
-            ids_values = self._normalize(ids_values)
+            ids_values = self._normalize(ids_values, data_name)
 
         return {self._id_to_name(id_): value for id_, value in ids_values.items()}
 
