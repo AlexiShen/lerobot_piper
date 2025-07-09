@@ -73,6 +73,7 @@ def teleop_only_loop(
         loop_start = time.perf_counter()
         action = teleop.get_action()
         load = teleop.get_load()
+        velocity = teleop.get_velocity()
 
         # Send feedback: set each joint to 0
         feedback = {joint: 0 for joint in action.keys()}
@@ -85,7 +86,7 @@ def teleop_only_loop(
             "joint6.effort": 0,
             # "joint7.effort": 0,
                     }
-        teleop.send_feedback_test(effort)
+        teleop.send_force_feedback(effort)
         # teleop.send_feedback(feedback)
 
         if display_data:
@@ -98,10 +99,10 @@ def teleop_only_loop(
         loop_s = time.perf_counter() - loop_start
 
         print("\n" + "-" * 20)
-        print(f"{'NAME':<10} | {'LOAD':>7} | {'ACTION':>7}")
+        print(f"{'NAME':<10} | {'LOAD':>7} | {'ACTION':>7} | {'VELOCITY':>7}")
         # for motor, value in action.items():
-        for (motor, load_val), (motor2, action_val) in zip(load.items(), action.items()):
-            print(f"{motor:<10} | {load_val:>7.2f} | {action_val:>7.2f}")
+        for (motor, load_val), (motor2, action_val), (motor3, velocity_val) in zip(load.items(), action.items(), velocity.items()):
+            print(f"{motor:<10} | {load_val:>7.2f} | {action_val:>7.2f} | {velocity_val:>7.2f}")
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
