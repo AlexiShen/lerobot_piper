@@ -97,6 +97,16 @@ class SO102Leader(Teleoperator):
         max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
         self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
+        
+        self.joint_limits = {
+            "joint1": (-2.6878, 2.6878),  # Example limits in radians
+            "joint2": (-1.701, 1.701),
+            "joint3": (-1.482, 1.482), # -170*1000
+            "joint4": (-1.74, 1.74), # [+- 100*1000]
+            "joint5": (-1.22, 1.22), # [+-70*1000]
+            "joint6": (-1.745, 1.745),
+            "joint7": (0.0, 0.08),  # Example limits for gripper
+        }
 
     @property
     def action_features(self) -> dict[str, type]:
@@ -244,8 +254,8 @@ class SO102Leader(Teleoperator):
     #         self.bus.write("Goal_Time", motor, value)
     #     # logger.info(f"{self} test sent feedback: {feedback}")
 
-    def send_force_feedback(self, feedback):
-        tau = self._compute_force_output()
+    def send_force_feedback(self, observation, feedback):
+        tau = self._compute_force_output(observation)
         tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
         # print("Tau table:", tau_dict)
@@ -264,7 +274,7 @@ class SO102Leader(Teleoperator):
 
 
 
-    def _compute_force_output(self):
+    def _compute_force_output(self, observation):
         action = self.get_action()
         velocity = self.get_velocity()
 
@@ -273,14 +283,16 @@ class SO102Leader(Teleoperator):
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
         q_dot_ee = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
+        q_follower = np.array([observation[f"{joint}.pos"] for joint in valid_joints])
 
         # pin.forwardKinematics(self.model, self.data, q)
         # joint2_id = self.model.getJointId("joint2")
         tau_g = self._compute_gravity_compensation(q, q_dot)
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
+        tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
 
-        tau = tau_vf + tau_ss + tau_g
+        tau =  tau_vf + tau_ss + tau_g + tau_joint
         return tau
 
     # Gravity compensation
@@ -323,6 +335,19 @@ class SO102Leader(Teleoperator):
             if abs(qd) > q_threshold:
                 tau_vf[i] = uc[i] * np.sign(qd) + uv[i] * qd
         return tau_vf * -1
+    
+    def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
+        Kp = [2, 2, 2, 2, 2, 2]
+        Kd = [1, 1, 1, 1, 1, 1]
+        tau_joint = np.zeros_like(q_leader)
+        for i, q_leader_val in enumerate(q_leader):
+            joint_diff = q_leader_val - q_follower[i]
+            if np.abs(joint_diff) > 0.02 and np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1]:
+                tau_joint[i] = Kp[i] * joint_diff
+        
+        tau_joint = np.append(tau_joint, 0)
+        return tau_joint
+        
 
     def _visualize_joint_origins(self, q=None):
         """

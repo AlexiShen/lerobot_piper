@@ -89,15 +89,15 @@ class PiperRobot(Robot):
         rospy.init_node(self.node_name, anonymous=True)
 
         # Publishers
-        self.enable_pub = rospy.Publisher('/enable_flag', Bool, queue_size=10)
-        self.joint_pub = rospy.Publisher('/joint_states', JointState, queue_size=10)
+        self.enable_pub = rospy.Publisher('/right_arm/enable_flag', Bool, queue_size=10)
+        self.joint_pub = rospy.Publisher('/right_arm/joint_ctrl_single', JointState, queue_size=10)
 
         # Subscribers (add callbacks as needed)
-        self.arm_status_sub = rospy.Subscriber('/arm_status', rospy.AnyMsg, self._arm_status_callback)
-        self.end_pose_sub = rospy.Subscriber('/end_pose', PoseStamped, self._end_pose_callback)
-        self.end_pose_euler_sub = rospy.Subscriber('/end_pose_euler', rospy.AnyMsg, self._end_pose_euler_callback)
-        self.joint_states_single_sub = rospy.Subscriber('/joint_states_single', JointState, self._joint_states_single_callback)
-        self.pos_cmd_sub = rospy.Subscriber('/pos_cmd', JointState, self._pos_cmd_callback)
+        self.arm_status_sub = rospy.Subscriber('/right_arm/arm_status', rospy.AnyMsg, self._arm_status_callback)
+        self.end_pose_sub = rospy.Subscriber('/right_arm/end_pose', PoseStamped, self._end_pose_callback)
+        self.end_pose_euler_sub = rospy.Subscriber('/right_arm/end_pose_euler', rospy.AnyMsg, self._end_pose_euler_callback)
+        self.joint_states_single_sub = rospy.Subscriber('/right_arm/joint_states_single', JointState, self._joint_states_single_callback)
+        self.pos_cmd_sub = rospy.Subscriber('/right_arm/pos_cmd', JointState, self._pos_cmd_callback)
 
         # Service proxies
         self.enable_srv = rospy.ServiceProxy('/enable_srv', Trigger)
@@ -164,12 +164,23 @@ class PiperRobot(Robot):
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
         observation = {}
+        effort = {}
         if self.current_joint_states_single:
-            for name, position in zip(self.current_joint_states_single.name, self.current_joint_states_single.position):
-                observation[f"{name}.pos"] = position
-        # TODO: Add effort observations later
+            for name, position, effort_val in zip(
+                self.current_joint_states_single.name, 
+                self.current_joint_states_single.position, 
+                self.current_joint_states_single.effort
+                ):
+                #Increment joint index
+                if name.startswith("joint") and name[5:].isdigit():
+                    idx = int(name[5:]) + 1
+                    name = f"joint{idx}"
+                
+                converted_position = self._convert_observation(name, position)
+                observation[f"{name}.pos"]  = converted_position
+                effort[f"{name}.effort"] = effort_val
 
-        return observation
+        return observation, effort
 
     # Convert so102 action to piper action
     # input action should have .pos removed from the keys
@@ -187,6 +198,10 @@ class PiperRobot(Robot):
             else:
                 raise ValueError(f"Joint {joint} not recognized in limits.")
         return converted_action
+    
+    def _convert_observation(self, name, value):
+        converted_value = value * self.transform[name][0] - self.transform[name][1]
+        return converted_value
 
     def _ensure_safe_goal_position(self, value: float, min_limit: float, max_limit: float) -> float:
         """
