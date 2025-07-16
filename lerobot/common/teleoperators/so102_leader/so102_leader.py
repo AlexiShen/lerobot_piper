@@ -258,15 +258,8 @@ class SO102Leader(Teleoperator):
             self.bus.write("Goal_Position", motor, value)
         # logger.info(f"{self} sent feedback: {feedback}")
 
-    # def send_feedback_test(self, feedback: dict[str, float]) -> None:
-    #     print(f"Sending feedback: {feedback}")
-    #     for motor, value in feedback.items():
-    #         motor = motor.split(".")[0]
-    #         self.bus.write("Goal_Time", motor, value)
-    #     # logger.info(f"{self} test sent feedback: {feedback}")
-
-    def send_force_feedback(self, observation, feedback):
-        tau = self._compute_force_output(observation)
+    def send_force_feedback(self, observation, effort_feedback):
+        tau = self._compute_force_output(observation, effort_feedback)
         tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
         # print("Tau table:", tau_dict)
@@ -283,9 +276,7 @@ class SO102Leader(Teleoperator):
             joint = self.model.joints[j_id]
             print(f"{jname}: axis = {joint.axis}, placement translation = {joint.placement.translation}")
 
-
-
-    def _compute_force_output(self, observation):
+    def _compute_force_output(self, observation, effort):
         action = self.get_action()
         velocity = self.get_velocity()
 
@@ -295,6 +286,11 @@ class SO102Leader(Teleoperator):
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
         q_dot_ee = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
         q_follower = np.array([observation[f"{joint}.pos"] for joint in valid_joints])
+        trigger_pos = action["joint7.pos"]
+        trigger_vel = velocity["joint7.vel"]
+        gripper_pos = observation["joint7.pos"]
+        gripper_effort = effort["joint7.effort"]
+
 
         # pin.forwardKinematics(self.model, self.data, q)
         # joint2_id = self.model.getJointId("joint2")
@@ -302,8 +298,10 @@ class SO102Leader(Teleoperator):
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
         tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
+        tau_trigger = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        tau =  tau_vf + tau_ss + tau_g + tau_joint
+        # tau =  tau_vf + tau_ss + tau_g + tau_joint + tau_trigger
+        tau = tau_trigger
         return tau
 
     # Gravity compensation
@@ -373,6 +371,13 @@ class SO102Leader(Teleoperator):
         tau_joint = np.append(tau_joint, 0)
         return tau_joint
         
+    def _compute_gripper_force(self, trigger_pos, trigger_vel, gripper_pos, gripper_effort):
+        trigger_tau = 0
+        tau = np.zeros(6)
+        if trigger_pos < gripper_pos:
+            trigger_tau = 10 * (gripper_pos - trigger_pos)# - 0.01 * trigger_vel + 0.5 * gripper_effort
+        tau = np.append(tau, trigger_tau)
+        return tau
 
     def _visualize_joint_origins(self, q=None):
         """
