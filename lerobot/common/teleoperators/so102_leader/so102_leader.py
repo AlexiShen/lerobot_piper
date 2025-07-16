@@ -107,6 +107,8 @@ class SO102Leader(Teleoperator):
             "joint6": (-1.745, 1.745),
             "joint7": (0.0, 0.08),  # Example limits for gripper
         }
+        self.if_synced = False
+        self.joint_integrals = np.zeros(6)
 
     @property
     def action_features(self) -> dict[str, type]:
@@ -236,6 +238,15 @@ class SO102Leader(Teleoperator):
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read load: {dt_ms:.1f}ms")
         return load
+    
+    def sync_leader_position(self, action, observation):
+        # for joint, leader_pos in action.items():
+        #     follower_pos = observation[joint]
+        #     diff = leader_pos - follower_pos
+        #     if abs(diff) > 0.2:
+        #         # print(f"Leader {joint} position {leader_pos:.2f} out of sync with follower {follower_pos:.2f}, adjusting...")
+        #         self.if_synced = False
+        return self.if_synced
 
     def send_feedback(self, feedback: dict[str, float]) -> None:
         # Sync write to Goal_Position using feedback dict
@@ -328,7 +339,7 @@ class SO102Leader(Teleoperator):
     
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
-        q_threshold = 0.09
+        q_threshold = 0.1
         uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
         uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.7]
         for i, qd in enumerate(q_dot):
@@ -337,14 +348,28 @@ class SO102Leader(Teleoperator):
         return tau_vf * -1
     
     def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
-        Kp = [2, 2, 2, 2, 2, 2]
-        Kd = [1, 1, 1, 1, 1, 1]
+        Kp = [3, 3, 3, 3, 3, 3]
+        Kd = 0.02 * np.ones_like(Kp)
+        Ki = 1 * np.ones_like(Kp)
+        if_synced_local_flag = True
         tau_joint = np.zeros_like(q_leader)
         for i, q_leader_val in enumerate(q_leader):
             joint_diff = q_leader_val - q_follower[i]
-            if np.abs(joint_diff) > 0.02 and np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1]:
-                tau_joint[i] = Kp[i] * joint_diff
+            if np.abs(joint_diff) > 0.3 and (np.abs(q_leader_val) < self.joint_limits[valid_joints[i]][1]):
+                if_synced_local_flag = False
+            if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not if_synced_local_flag):
+                tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
+                self.joint_integrals[i] += joint_diff * 0.2
+                # if self.joint_integrals[i] > 0.5:
+                #     self.joint_integrals[i] = 0.5
+                # elif self.joint_integrals[i] < -0.5:
+                #     self.joint_integrals[i] = -0.5
+            else:
+                self.joint_integrals[i] = 0
+                tau_joint[i] = 0
         
+        self.if_synced = if_synced_local_flag
+        print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)
         return tau_joint
         

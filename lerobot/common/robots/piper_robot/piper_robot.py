@@ -214,7 +214,7 @@ class PiperRobot(Robot):
             return max_limit
         return value
 
-    def send_action(self, action):
+    def send_action(self, action: dict[str, float]) -> dict[str, float]:
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
         

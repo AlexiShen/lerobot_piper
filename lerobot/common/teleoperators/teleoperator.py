@@ -124,6 +124,11 @@ class Teleoperator(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def sync_leader_position(self, action, observation: dict[str, Any]) -> None:
+        """Syncs the teleoperator position to the robot observation."""
+        pass
+
+    @abc.abstractmethod
     def disconnect(self) -> None:
         """Disconnects from the teleoperator."""
         pass

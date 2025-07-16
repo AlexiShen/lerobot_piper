@@ -101,6 +101,9 @@ def teleop_loop(
         #         if isinstance(val, float):
         #             rr.log(f"action_{act}", rr.Scalars(val))
 
+        if_arms_synced = teleop.sync_leader_position(action, observation)
+        # print(f"if_arms_synced: {if_arms_synced}")
+        # if if_arms_synced:
         action_sent = robot.send_action(action)
         # effort= {
         #     "joint1.effort": 0,
