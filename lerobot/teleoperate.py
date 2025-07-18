@@ -87,7 +87,9 @@ def teleop_loop(
             break
         loop_start = time.perf_counter()
         action = teleop.get_action()
-        observation = robot.get_observation()
+        load = teleop.get_load()
+        velocity = teleop.get_velocity()
+        observation, effort = robot.get_observation()
         # if display_data:
         #     observation = robot.get_observation()
         #     for obs, val in observation.items():
@@ -99,17 +101,20 @@ def teleop_loop(
         #         if isinstance(val, float):
         #             rr.log(f"action_{act}", rr.Scalars(val))
 
+        if_arms_synced = teleop.sync_leader_position(action, observation)
+        # print(f"if_arms_synced: {if_arms_synced}")
+        # if if_arms_synced:
         action_sent = robot.send_action(action)
-        effort= {
-            "joint1.effort": 0,
-            "joint2.effort": -90,
-            "joint3.effort": 90,
-            "joint4.effort": 0,
-            "joint5.effort": 100,
-            "joint6.effort": 0,
-            # "joint7.effort": 0,
-                    }
-        teleop.send_force_feedback(effort)
+        # effort= {
+        #     "joint1.effort": 0,
+        #     "joint2.effort": -90,
+        #     "joint3.effort": 90,
+        #     "joint4.effort": 0,
+        #     "joint5.effort": 100,
+        #     "joint6.effort": 0,
+        #     # "joint7.effort": 0,
+        #             }
+        teleop.send_force_feedback(observation, effort)
         # zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
         # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
         # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
@@ -119,22 +124,19 @@ def teleop_loop(
 
         loop_s = time.perf_counter() - loop_start
 
+        # print(observation.__sizeof__())
         print("\n" + "-" * (display_len + 10))
-        print(f"{'NAME':<{display_len}} | {'NORM':>7}")
-        for motor, value in action.items():
-            print(f"{motor:<{display_len}} | {value:>7.2f}")
-        print(f"{'Observations':<{display_len}} | {'Rad':>7}")
-        for obs, val in observation.items():
-            print(f"{obs:<{display_len}} | {val:>7.2f}")
-        print(f"{'Action sent':<{display_len}} | {'Rad':>7}")
-        for act, val in action_sent.items():
-            print(f"{act:<{display_len}} | {val:>7.2f}")
+        print(f"{'NAME':<{display_len}} | {'ACTION':>7} | {'EFFORT':>7} | {'VELOCITY':>7} | {'OBSERVATION':>7} | {'EFFORT':>7}")
+        for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val) , (joint2, eff_val)\
+            in zip(load.items(), action.items(), velocity.items(), observation.items(), effort.items()):
+            print(f"{motor:<{display_len}} | {action_val:>7.2f} | {load_val:>7.2f} | {velocity_val:>7.2f} | {obs_val:>7.2f} | {eff_val:>7.2f}")
+        
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
             return
 
-        move_cursor_up(len(action) + len(observation) + len(action_sent) + 8)
+        # move_cursor_up(len(action)+ 8)
 
 
 @draccus.wrap()

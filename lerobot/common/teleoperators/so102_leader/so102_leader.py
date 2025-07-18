@@ -97,6 +97,18 @@ class SO102Leader(Teleoperator):
         max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
         self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
+        
+        self.joint_limits = {
+            "joint1": (-2.6878, 2.6878),  # Example limits in radians
+            "joint2": (-1.701, 1.701),
+            "joint3": (-1.482, 1.482), # -170*1000
+            "joint4": (-1.74, 1.74), # [+- 100*1000]
+            "joint5": (-1.22, 1.22), # [+-70*1000]
+            "joint6": (-1.745, 1.745),
+            "joint7": (0.0, 0.08),  # Example limits for gripper
+        }
+        self.if_synced = False
+        self.joint_integrals = np.zeros(6)
 
     @property
     def action_features(self) -> dict[str, type]:
@@ -226,6 +238,15 @@ class SO102Leader(Teleoperator):
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read load: {dt_ms:.1f}ms")
         return load
+    
+    def sync_leader_position(self, action, observation):
+        # for joint, leader_pos in action.items():
+        #     follower_pos = observation[joint]
+        #     diff = leader_pos - follower_pos
+        #     if abs(diff) > 0.2:
+        #         # print(f"Leader {joint} position {leader_pos:.2f} out of sync with follower {follower_pos:.2f}, adjusting...")
+        #         self.if_synced = False
+        return self.if_synced
 
     def send_feedback(self, feedback: dict[str, float]) -> None:
         # Sync write to Goal_Position using feedback dict
@@ -237,15 +258,8 @@ class SO102Leader(Teleoperator):
             self.bus.write("Goal_Position", motor, value)
         # logger.info(f"{self} sent feedback: {feedback}")
 
-    # def send_feedback_test(self, feedback: dict[str, float]) -> None:
-    #     print(f"Sending feedback: {feedback}")
-    #     for motor, value in feedback.items():
-    #         motor = motor.split(".")[0]
-    #         self.bus.write("Goal_Time", motor, value)
-    #     # logger.info(f"{self} test sent feedback: {feedback}")
-
-    def send_force_feedback(self, feedback):
-        tau = self._compute_force_output()
+    def send_force_feedback(self, observation, effort_feedback):
+        tau = self._compute_force_output(observation, effort_feedback)
         tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
         # print("Tau table:", tau_dict)
@@ -262,9 +276,7 @@ class SO102Leader(Teleoperator):
             joint = self.model.joints[j_id]
             print(f"{jname}: axis = {joint.axis}, placement translation = {joint.placement.translation}")
 
-
-
-    def _compute_force_output(self):
+    def _compute_force_output(self, observation, effort):
         action = self.get_action()
         velocity = self.get_velocity()
 
@@ -273,14 +285,23 @@ class SO102Leader(Teleoperator):
         q = np.array([action[f"{joint}.pos"] for joint in valid_joints])
         q_dot = np.array([velocity[f"{joint}.vel"] for joint in valid_joints])
         q_dot_ee = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
+        q_follower = np.array([observation[f"{joint}.pos"] for joint in valid_joints])
+        trigger_pos = action["joint7.pos"]
+        trigger_vel = velocity["joint7.vel"]
+        gripper_pos = observation["joint7.pos"]
+        gripper_effort = effort["joint7.effort"]
+
 
         # pin.forwardKinematics(self.model, self.data, q)
         # joint2_id = self.model.getJointId("joint2")
         tau_g = self._compute_gravity_compensation(q, q_dot)
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
+        tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
+        tau_trigger = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        tau = tau_vf + tau_ss + tau_g
+        # tau =  tau_vf + tau_ss + tau_g + tau_joint + tau_trigger
+        tau = tau_trigger
         return tau
 
     # Gravity compensation
@@ -316,13 +337,47 @@ class SO102Leader(Teleoperator):
     
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
-        q_threshold = 0.09
+        q_threshold = 0.1
         uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
         uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.7]
         for i, qd in enumerate(q_dot):
             if abs(qd) > q_threshold:
                 tau_vf[i] = uc[i] * np.sign(qd) + uv[i] * qd
         return tau_vf * -1
+    
+    def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
+        Kp = [3, 3, 3, 3, 3, 3]
+        Kd = 0.02 * np.ones_like(Kp)
+        Ki = 1 * np.ones_like(Kp)
+        if_synced_local_flag = True
+        tau_joint = np.zeros_like(q_leader)
+        for i, q_leader_val in enumerate(q_leader):
+            joint_diff = q_leader_val - q_follower[i]
+            if np.abs(joint_diff) > 0.3 and (np.abs(q_leader_val) < self.joint_limits[valid_joints[i]][1]):
+                if_synced_local_flag = False
+            if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not if_synced_local_flag):
+                tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
+                self.joint_integrals[i] += joint_diff * 0.2
+                # if self.joint_integrals[i] > 0.5:
+                #     self.joint_integrals[i] = 0.5
+                # elif self.joint_integrals[i] < -0.5:
+                #     self.joint_integrals[i] = -0.5
+            else:
+                self.joint_integrals[i] = 0
+                tau_joint[i] = 0
+        
+        self.if_synced = if_synced_local_flag
+        print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
+        tau_joint = np.append(tau_joint, 0)
+        return tau_joint
+        
+    def _compute_gripper_force(self, trigger_pos, trigger_vel, gripper_pos, gripper_effort):
+        trigger_tau = 0
+        tau = np.zeros(6)
+        if trigger_pos < gripper_pos:
+            trigger_tau = 10 * (gripper_pos - trigger_pos)# - 0.01 * trigger_vel + 0.5 * gripper_effort
+        tau = np.append(tau, trigger_tau)
+        return tau
 
     def _visualize_joint_origins(self, q=None):
         """
