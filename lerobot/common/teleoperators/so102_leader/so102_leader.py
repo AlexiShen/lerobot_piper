@@ -78,6 +78,8 @@ class SO102Leader(Teleoperator):
 
         self.t_static = time.perf_counter()
         self.if_gripping = False
+        self.prev_trigger_tau = 0
+        self.gripper_effort_limit = 2
 
         self.bus = FeetechMotorsBus(
             port=self.config.port,
@@ -260,9 +262,10 @@ class SO102Leader(Teleoperator):
         # logger.info(f"{self} sent feedback: {feedback}")
 
     def send_force_feedback(self, observation, effort_feedback):
-        tau = self._compute_force_output(observation, effort_feedback)
-        tau = np.append(tau, 0)
+        tau, effort_to_send = self._compute_force_output(observation, effort_feedback)
+        # tau = np.append(tau, 0)
         tau_dict = {f"{joint}.tau": t for joint, t in zip(self.bus.motors.keys(), tau)}
+        effort_dict = {f"{joint}.effort": t for joint, t in zip(self.bus.motors.keys(), effort_to_send)}
         # print("Tau table:", tau_dict)
         for motor, value in tau_dict.items():
             motor = motor.split(".")[0]
@@ -270,6 +273,7 @@ class SO102Leader(Teleoperator):
             self.bus.write("Goal_Time", motor, pwm_int)
         # logger.info(f"{self} test sent feedback: {feedback}")
         # print("CoM:", self.model.inertias[2].lever)
+        return effort_dict
 
     def _print_joint_model_info(self):
         for jname in self.model.names[1:]:
@@ -299,12 +303,14 @@ class SO102Leader(Teleoperator):
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
         tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
-        tau_trigger = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
+        tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        tau =  tau_vf + tau_ss + tau_g + tau_joint + tau_trigger
+        tau =  tau_vf + tau_g + tau_joint + tau_trigger + tau_ss 
         # tau = tau_trigger
         tau = self._safe_guard_torque(tau)
-        return tau
+        effort_to_send = np.zeros(6)
+        effort_to_send = np.append(effort_to_send, gripper_effort_to_send)
+        return tau, effort_to_send
 
     # Gravity compensation
     def _compute_gravity_compensation(self, q, q_dot):
@@ -325,7 +331,7 @@ class SO102Leader(Teleoperator):
         q_threshold = 0.09
         us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
         if self.if_gripping:
-            us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
+            us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
         for i, qd in enumerate(q_dot):
             if abs(qd) < q_threshold:
                 if_increment_time = True
@@ -342,11 +348,11 @@ class SO102Leader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
-        uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
-        if self.if_gripping:
-            uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.3]
-            uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
+        uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+        uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+        # if self.if_gripping:
+        #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
+        #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
         for i, qd in enumerate(q_dot):
             if abs(qd) > q_threshold:
                 tau_vf[i] = uc[i] * np.sign(qd) + uv[i] * qd
@@ -374,22 +380,33 @@ class SO102Leader(Teleoperator):
                 tau_joint[i] = 0
         
         self.if_synced = if_synced_local_flag
-        print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
+        # print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)
         return tau_joint
         
     def _compute_gripper_force(self, trigger_pos, trigger_vel, gripper_pos, gripper_effort):
         trigger_tau = 0
         tau = np.zeros(6)
-        if trigger_pos < gripper_pos and gripper_effort < -0.3:
-            trigger_tau = -(50 * (gripper_pos - trigger_pos))# - 0.01 * trigger_vel + 0.5 * gripper_effort
+        gripper_effort_to_send = 0
+        trigger_diff  = gripper_pos - trigger_pos
+        if trigger_diff > 0.001 and gripper_effort < -0.25:
+            # trigger_tau = -(50 * (gripper_pos - trigger_pos))# - 0.01 * trigger_vel + 0.5 * gripper_effort
+            trigger_tau = -(25 * trigger_diff) - 0.2#0.1 * (-50*(trigger_diff) + (1 - 0.1) * self.prev_trigger_tau)
+            gripper_effort_delta =  trigger_diff * 40
+            gripper_effort_to_send = 0.5 + gripper_effort_delta
+            self.prev_trigger_tau = trigger_tau
             self.if_gripping = True
         else:
             self.if_gripping = False
         if trigger_pos > 0.08:
-            trigger_tau = -50 * (gripper_pos - trigger_pos)
+            trigger_tau = -50 * trigger_diff
         tau = np.append(tau, trigger_tau)
-        return tau
+        if gripper_effort_to_send > self.gripper_effort_limit:
+            gripper_effort_to_send = self.gripper_effort_limit
+        elif gripper_effort_to_send < -self.gripper_effort_limit:
+            gripper_effort_to_send = -self.gripper_effort_limit
+        print(f"Gripper force: {gripper_effort_to_send}, trigger_pos: {trigger_pos}, gripper_pos: {gripper_pos}, trigger_tau: {trigger_tau}")
+        return tau, gripper_effort_to_send
 
     def _safe_guard_torque(self, tau):
         """
