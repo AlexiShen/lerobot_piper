@@ -77,6 +77,7 @@ class SO102Leader(Teleoperator):
         # self.vis.loadViewerModel()
 
         self.t_static = time.perf_counter()
+        self.if_gripping = False
 
         self.bus = FeetechMotorsBus(
             port=self.config.port,
@@ -300,8 +301,9 @@ class SO102Leader(Teleoperator):
         tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
         tau_trigger = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        # tau =  tau_vf + tau_ss + tau_g + tau_joint + tau_trigger
-        tau = tau_trigger
+        tau =  tau_vf + tau_ss + tau_g + tau_joint + tau_trigger
+        # tau = tau_trigger
+        tau = self._safe_guard_torque(tau)
         return tau
 
     # Gravity compensation
@@ -321,7 +323,9 @@ class SO102Leader(Teleoperator):
         if_increment_time = False
         dt = 0.000001
         q_threshold = 0.09
-        us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4]
+        us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
+        if self.if_gripping:
+            us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
         for i, qd in enumerate(q_dot):
             if abs(qd) < q_threshold:
                 if_increment_time = True
@@ -339,7 +343,10 @@ class SO102Leader(Teleoperator):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
         uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
-        uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.7]
+        uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
+        if self.if_gripping:
+            uc = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.3]
+            uv = [0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.4]
         for i, qd in enumerate(q_dot):
             if abs(qd) > q_threshold:
                 tau_vf[i] = uc[i] * np.sign(qd) + uv[i] * qd
@@ -353,8 +360,8 @@ class SO102Leader(Teleoperator):
         tau_joint = np.zeros_like(q_leader)
         for i, q_leader_val in enumerate(q_leader):
             joint_diff = q_leader_val - q_follower[i]
-            if np.abs(joint_diff) > 0.3 and (np.abs(q_leader_val) < self.joint_limits[valid_joints[i]][1]):
-                if_synced_local_flag = False
+            # if np.abs(joint_diff) > 0.3 and (np.abs(q_leader_val) < self.joint_limits[valid_joints[i]][1]):
+            #     if_synced_local_flag = False
             if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not if_synced_local_flag):
                 tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
                 self.joint_integrals[i] += joint_diff * 0.2
@@ -374,9 +381,25 @@ class SO102Leader(Teleoperator):
     def _compute_gripper_force(self, trigger_pos, trigger_vel, gripper_pos, gripper_effort):
         trigger_tau = 0
         tau = np.zeros(6)
-        if trigger_pos < gripper_pos:
-            trigger_tau = 10 * (gripper_pos - trigger_pos)# - 0.01 * trigger_vel + 0.5 * gripper_effort
+        if trigger_pos < gripper_pos and gripper_effort < -0.3:
+            trigger_tau = -(50 * (gripper_pos - trigger_pos))# - 0.01 * trigger_vel + 0.5 * gripper_effort
+            self.if_gripping = True
+        else:
+            self.if_gripping = False
+        if trigger_pos > 0.08:
+            trigger_tau = -50 * (gripper_pos - trigger_pos)
         tau = np.append(tau, trigger_tau)
+        return tau
+
+    def _safe_guard_torque(self, tau):
+        """
+        Ensure the torque does not exceed the limits.
+        """
+        for i, joint in enumerate(self.bus.motors.keys()):
+            if tau[i] > 2.5:
+                tau[i] = 2.5
+            elif tau[i] < -2.5:
+                tau[i] = -2.5
         return tau
 
     def _visualize_joint_origins(self, q=None):
