@@ -214,7 +214,7 @@ class PiperRobot(Robot):
             return max_limit
         return value
 
-    def send_action(self, action: dict[str, float]) -> dict[str, float]:
+    def send_action(self, action: dict[str, float], effort: dict[str, float]) -> dict[str, float]:
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
         
@@ -227,6 +227,9 @@ class PiperRobot(Robot):
         joint_state_msg = JointState()
         joint_state_msg.name = list(converted_action.keys())      # Compliant with ROS JointState
         joint_state_msg.position = list(converted_action.values())
+        if effort["joint7.effort"] >= 0.5:
+            joint_state_msg.effort = list(effort.values())
+        # print(f"effort: {effort}")
         # joint_state_msg.velocity = [0.0] * len(goal_pos)
         # joint_state_msg.effort = [0.0] * len(goal_pos)
         self.joint_pub.publish(joint_state_msg)

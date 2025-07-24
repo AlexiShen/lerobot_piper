@@ -104,7 +104,8 @@ def teleop_loop(
         if_arms_synced = teleop.sync_leader_position(action, observation)
         # print(f"if_arms_synced: {if_arms_synced}")
         # if if_arms_synced:
-        action_sent = robot.send_action(action)
+        effort_to_send = teleop.send_force_feedback(observation, effort)
+        action_sent = robot.send_action(action, effort_to_send)
         # effort= {
         #     "joint1.effort": 0,
         #     "joint2.effort": -90,
@@ -114,7 +115,7 @@ def teleop_loop(
         #     "joint6.effort": 0,
         #     # "joint7.effort": 0,
         #             }
-        teleop.send_force_feedback(observation, effort)
+        
         # zero_pos = [0.2,0.3,-0.2,0.3,-0.2,0.5,0.01]
         # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
         # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}

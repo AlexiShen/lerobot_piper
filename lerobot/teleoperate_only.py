@@ -84,7 +84,7 @@ def teleop_only_loop(
             "joint4.pos": 0,
             "joint5.pos": 0,
             "joint6.pos": 0,
-            "joint7.pos": 0,
+            "joint7.pos": 0.04,
         }
         effort= {
             "joint1.effort": 0,
