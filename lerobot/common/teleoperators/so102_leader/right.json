@@ -2,50 +2,50 @@
     "joint1": {
         "id": 1,
         "drive_mode": 0,
-        "homing_offset": 1880,
-        "range_min": 919,
-        "range_max": 3150
+        "homing_offset": 1810,
+        "range_min": 996,
+        "range_max": 2935
     },
     "joint2": {
         "id": 2,
         "drive_mode": 0,
-        "homing_offset": -1248,
-        "range_min": 751,
-        "range_max": 3313
+        "homing_offset": -1596,
+        "range_min": 800,
+        "range_max": 3108
     },
     "joint3": {
         "id": 3,
         "drive_mode": 0,
-        "homing_offset": 1540,
-        "range_min": 886,
-        "range_max": 3075
+        "homing_offset": 1250,
+        "range_min": 896,
+        "range_max": 3079
     },
     "joint4": {
         "id": 4,
         "drive_mode": 0,
-        "homing_offset": -1718,
-        "range_min": 21,
-        "range_max": 4078
+        "homing_offset": 1323,
+        "range_min": 0,
+        "range_max": 4095
     },
     "joint5": {
         "id": 5,
         "drive_mode": 0,
-        "homing_offset": 1672,
-        "range_min": 782,
-        "range_max": 3082
+        "homing_offset": 1972,
+        "range_min": 937,
+        "range_max": 3241
     },
     "joint6": {
         "id": 6,
         "drive_mode": 0,
-        "homing_offset": 1523,
-        "range_min": 186,
-        "range_max": 3995
+        "homing_offset": -1582,
+        "range_min": 31,
+        "range_max": 3924
     },
     "joint7": {
         "id": 7,
         "drive_mode": 0,
-        "homing_offset": 1529,
-        "range_min": 1851,
-        "range_max": 2334
+        "homing_offset": 1780,
+        "range_min": 2031,
+        "range_max": 2675
     }
 }
