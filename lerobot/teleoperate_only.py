@@ -84,7 +84,7 @@ def teleop_only_loop(
             "joint4.pos": 0,
             "joint5.pos": 0,
             "joint6.pos": 0,
-            "joint7.pos": 0.04,
+            "joint7.pos": 0.0,
         }
         effort= {
             "joint1.effort": 0,
@@ -96,6 +96,7 @@ def teleop_only_loop(
             "joint7.effort": 0,
                     }
         teleop.send_force_feedback(observation, effort)
+        print(f"if_arms_synced: {teleop.sync_leader_position()}")
         # teleop.send_feedback(feedback)
 
         if display_data:

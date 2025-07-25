@@ -94,6 +94,11 @@ class Robot(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def home(self) -> None:
+        """Moves the robot to its home position."""
+        pass
+
+    @abc.abstractmethod
     def get_observation(self) -> dict[str, Any]:
         """Gets observation from the robot."""
         pass

@@ -94,12 +94,9 @@ class SO102Leader(Teleoperator):
             },
             calibration=self.calibration,
         )
-        trigger_min = self.bus.calibration["joint7"].range_min
-        trigger_max = self.bus.calibration["joint7"].range_max
-        trigger_mid = (trigger_min + trigger_max) / 2
-        max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
-        self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
-                               (trigger_max - trigger_mid)/max_res * 2*np.pi)
+        # if self.bus.is_calibrated:
+        self.trigger_limits = (-1, 1)
+        
         
         self.joint_limits = {
             "joint1": (-2.6878, 2.6878),  # Example limits in radians
@@ -141,6 +138,12 @@ class SO102Leader(Teleoperator):
             # else:
             #     logger.info(f"Calibration file does not exist at {calibration_file}.")
             self.calibrate()
+            trigger_min = self.bus.calibration["joint7"].range_min
+            trigger_max = self.bus.calibration["joint7"].range_max
+            trigger_mid = (trigger_min + trigger_max) / 2
+            max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
+            self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
+                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -242,14 +245,27 @@ class SO102Leader(Teleoperator):
         logger.debug(f"{self} read load: {dt_ms:.1f}ms")
         return load
     
-    def sync_leader_position(self, action, observation):
-        # for joint, leader_pos in action.items():
-        #     follower_pos = observation[joint]
-        #     diff = leader_pos - follower_pos
-        #     if abs(diff) > 0.2:
-        #         # print(f"Leader {joint} position {leader_pos:.2f} out of sync with follower {follower_pos:.2f}, adjusting...")
-        #         self.if_synced = False
+    # def sync_leader_position(self, action, velocity, observation):
+    #     local_sync_flag = True
+    #     for joint, leader_pos in action.items():
+    #         follower_pos = observation[joint]
+    #         leader_vel = velocity[joint.replace(".pos", ".vel")]
+    #         diff = leader_pos - follower_pos
+    #         if abs(diff) > 0.1 and leader_vel > 0.05:
+    #             # print(f"Leader {joint} position {leader_pos:.2f} out of sync with follower {follower_pos:.2f}, adjusting...")
+    #             local_sync_flag = False
+    #     self.if_synced = local_sync_flag
+    #     return local_sync_flag
+
+    def sync_leader_position(self):
         return self.if_synced
+    
+    def _check_if_synced(self, q_leader, q_follower, q_dot):
+        for i in range(len(q_leader)):
+            joint_diff = q_leader[i] - q_follower[i]
+            if np.abs(joint_diff) > 0.2 or (np.abs(q_dot[i]) > 0.1):
+                return False
+        return True
 
     def send_feedback(self, feedback: dict[str, float]) -> None:
         # Sync write to Goal_Position using feedback dict
@@ -329,9 +345,9 @@ class SO102Leader(Teleoperator):
         if_increment_time = False
         dt = 0.000001
         q_threshold = 0.09
-        us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
+        us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4]
         if self.if_gripping:
-            us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+            us = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3]
         for i, qd in enumerate(q_dot):
             if abs(qd) < q_threshold:
                 if_increment_time = True
@@ -350,8 +366,8 @@ class SO102Leader(Teleoperator):
         q_threshold = 0.1
         # uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
         # uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        uc = [0.33, 0.33, 0.33, 0.33, 0.33, 0.33, 0.33]
-        uv = [0.33, 0.33, 0.33, 0.33, 0.33, 0.33, 0.33]
+        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
+        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:
         #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
         #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
@@ -361,27 +377,29 @@ class SO102Leader(Teleoperator):
         return tau_vf * -1
     
     def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
-        Kp = [3, 3, 3, 3, 3, 3]
-        Kd = 0.02 * np.ones_like(Kp)
-        Ki = 1 * np.ones_like(Kp)
-        if_synced_local_flag = True
+        Kp = [1, 5, 7, 3, 3, 3]
+        Kd = 0.03 * np.ones_like(Kp)
+        Ki = 0 * np.ones_like(Kp)
         tau_joint = np.zeros_like(q_leader)
+        if self._check_if_synced(q_leader, q_follower, q_dot):
+            self.if_synced = True
         for i, q_leader_val in enumerate(q_leader):
             joint_diff = q_leader_val - q_follower[i]
             # if np.abs(joint_diff) > 0.3 and (np.abs(q_leader_val) < self.joint_limits[valid_joints[i]][1]):
             #     if_synced_local_flag = False
-            if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not if_synced_local_flag):
+            # print(f"Joint {valid_joints[i]} diff: {joint_diff:.3f}, integral: {self.joint_integrals[i]:.3f}, tau_joint: {tau_joint[i]:.3f}")
+            if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not self.if_synced):
                 tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
                 self.joint_integrals[i] += joint_diff * 0.2
-                # if self.joint_integrals[i] > 0.5:
-                #     self.joint_integrals[i] = 0.5
-                # elif self.joint_integrals[i] < -0.5:
-                #     self.joint_integrals[i] = -0.5
+                if self.joint_integrals[i] > 0.5:
+                    self.joint_integrals[i] = 0.5
+                elif self.joint_integrals[i] < -0.5:
+                    self.joint_integrals[i] = -0.5
             else:
                 self.joint_integrals[i] = 0
                 tau_joint[i] = 0
         
-        self.if_synced = if_synced_local_flag
+        # self.if_synced = if_synced_local_flag
         # print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)
         return tau_joint

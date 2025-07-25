@@ -33,6 +33,7 @@ from ..robot import Robot
 # from ..utils import ensure_safe_goal_position
 from .config_piper_robot import PiperRobotConfig
 import math
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,18 @@ class PiperRobot(Robot):
             "joint6": (-1.745, 1.745),
             "joint7": (0.0, 0.08),  # Example limits for gripper
         }
+
+        self.home_position = {
+            "joint1": 0.0,
+            "joint2": 0,
+            "joint3": 0,
+            "joint4": 0.0,
+            "joint5": 1,
+            "joint6": 0.0,
+            "joint7": 0.0,  # Gripper closed position
+        } # In leader arm frame !!!
+        self.is_homed = False
+        self.zero_velocity = {f"{joint}.vel": 0.0 for joint in self.joints}
 
         # self.joint_limits = {
         #     joint: (math.radians(lim[0]), math.radians(lim[1]))
@@ -214,7 +227,7 @@ class PiperRobot(Robot):
             return max_limit
         return value
 
-    def send_action(self, action: dict[str, float], effort: dict[str, float]) -> dict[str, float]:
+    def send_action(self, action: dict[str, float], effort: dict[str, float], velocity: dict[str, float] = None) -> dict[str, float]:
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
         
@@ -229,12 +242,43 @@ class PiperRobot(Robot):
         joint_state_msg.position = list(converted_action.values())
         if effort["joint7.effort"] >= 0.5:
             joint_state_msg.effort = list(effort.values())
-        # print(f"effort: {effort}")
-        # joint_state_msg.velocity = [0.0] * len(goal_pos)
-        # joint_state_msg.effort = [0.0] * len(goal_pos)
+        if velocity:
+            joint_state_msg.velocity = list(velocity.values())
+        # else:
+        #     joint_state_msg.velocity = [20, 20, 20, 20, 20, 20, 20]
         self.joint_pub.publish(joint_state_msg)
+        # print(f"Sending action: {joint_state_msg}")
 
         return {f"{motor}.pos": val for motor, val in converted_action.items()}
+
+    def home(self) -> bool:
+        if not self.is_connected:
+            raise DeviceNotConnectedError(f"{self} is not connected.")
+
+        # Ensure the robot is homed
+        # if self.is_homed:
+            # logger.info(f"{self} is already homed.")
+            # return True
+        home_action = {f"{joint}.pos": pos for joint, pos in self.home_position.items()}
+        effort = {f"{joint}.effort": 0.0 for joint in self.joints}
+        velocity = {f"{joint}.vel": 20.0 for joint in self.joints}
+        if self._check_if_homed():
+            self.is_homed = True
+        # Send home position
+        if not self.is_homed:
+            self.send_action(home_action, effort, velocity)
+            
+        return self.is_homed
+
+    def _check_if_homed(self) -> bool:
+        observation, effort = self.get_observation()
+        observation = {key.removesuffix(".pos"): val for key, val in observation.items()}
+        for joint, value in observation.items():
+            error = value - self.home_position[joint]
+            if abs(error) > 0.15:
+                return False
+        return True
+
     
     def disconnect(self) -> None:
         if not self.is_connected:

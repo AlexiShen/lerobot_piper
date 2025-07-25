@@ -90,22 +90,14 @@ def teleop_loop(
         load = teleop.get_load()
         velocity = teleop.get_velocity()
         observation, effort = robot.get_observation()
-        # if display_data:
-        #     observation = robot.get_observation()
-        #     for obs, val in observation.items():
-        #         if isinstance(val, float):
-        #             rr.log(f"observation_{obs}", rr.Scalars(val))
-        #         elif isinstance(val, np.ndarray):
-        #             rr.log(f"observation_{obs}", rr.Image(val), static=True)
-        #     for act, val in action.items():
-        #         if isinstance(val, float):
-        #             rr.log(f"action_{act}", rr.Scalars(val))
-
-        if_arms_synced = teleop.sync_leader_position(action, observation)
-        # print(f"if_arms_synced: {if_arms_synced}")
-        # if if_arms_synced:
-        effort_to_send = teleop.send_force_feedback(observation, effort)
-        action_sent = robot.send_action(action, effort_to_send)
+        is_robot_homed = robot.home()
+        # print(f"Robot is homed: {is_robot_homed}")
+        if is_robot_homed:
+            if_arms_synced = teleop.sync_leader_position()
+            effort_to_send = teleop.send_force_feedback(observation, effort)
+            print(f"if_arms_synced: {if_arms_synced} | is_robot_homed: {is_robot_homed}")
+            if if_arms_synced:
+                action_sent = robot.send_action(action, effort_to_send)
         # effort= {
         #     "joint1.effort": 0,
         #     "joint2.effort": -90,
@@ -120,6 +112,18 @@ def teleop_loop(
         # joint_names = [key.removesuffix(".pos") for key in robot.action_features]
         # zero_action = {key: zero_pos[i] for i, key in enumerate(robot.action_features)}
         # action_sent = robot.send_action(zero_action)
+
+
+         # if display_data:
+        #     observation = robot.get_observation()
+        #     for obs, val in observation.items():
+        #         if isinstance(val, float):
+        #             rr.log(f"observation_{obs}", rr.Scalars(val))
+        #         elif isinstance(val, np.ndarray):
+        #             rr.log(f"observation_{obs}", rr.Image(val), static=True)
+        #     for act, val in action.items():
+        #         if isinstance(val, float):
+        #             rr.log(f"action_{act}", rr.Scalars(val))
         dt_s = time.perf_counter() - loop_start
         busy_wait(1 / fps - dt_s)
 
@@ -152,7 +156,6 @@ def teleoperate(cfg: TeleoperateConfig):
 
     teleop.connect()
     robot.connect()
-
     try:
         teleop_loop(teleop, robot, cfg.fps, display_data=cfg.display_data, duration=cfg.teleop_time_s)
     except KeyboardInterrupt:
