@@ -263,7 +263,7 @@ class SO102Leader(Teleoperator):
     def _check_if_synced(self, q_leader, q_follower, q_dot):
         for i in range(len(q_leader)):
             joint_diff = q_leader[i] - q_follower[i]
-            if np.abs(joint_diff) > 0.2 or (np.abs(q_dot[i]) > 0.1):
+            if np.abs(joint_diff) > 0.05 or (np.abs(q_dot[i]) > 0.1):
                 return False
         return True
 
@@ -366,8 +366,8 @@ class SO102Leader(Teleoperator):
         q_threshold = 0.1
         # uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
         # uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
-        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
+        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.3]
+        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.3]
         # if self.if_gripping:
         #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
         #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
@@ -377,7 +377,7 @@ class SO102Leader(Teleoperator):
         return tau_vf * -1
     
     def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
-        Kp = [1, 5, 7, 3, 3, 3]
+        Kp = [5, 20, 20, 3, 8, 3]
         Kd = 0.03 * np.ones_like(Kp)
         Ki = 0 * np.ones_like(Kp)
         tau_joint = np.zeros_like(q_leader)
@@ -390,15 +390,15 @@ class SO102Leader(Teleoperator):
             # print(f"Joint {valid_joints[i]} diff: {joint_diff:.3f}, integral: {self.joint_integrals[i]:.3f}, tau_joint: {tau_joint[i]:.3f}")
             if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not self.if_synced):
                 tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
-                self.joint_integrals[i] += joint_diff * 0.2
-                if self.joint_integrals[i] > 0.5:
-                    self.joint_integrals[i] = 0.5
-                elif self.joint_integrals[i] < -0.5:
-                    self.joint_integrals[i] = -0.5
+                self.joint_integrals[i] += joint_diff 
+                if self.joint_integrals[i] > 50:
+                    self.joint_integrals[i] = 50
+                elif self.joint_integrals[i] < -50:
+                    self.joint_integrals[i] = -50
             else:
                 self.joint_integrals[i] = 0
                 tau_joint[i] = 0
-        
+        # print(f"Joint integrals: {self.joint_integrals}")
         # self.if_synced = if_synced_local_flag
         # print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)

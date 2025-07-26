@@ -70,15 +70,35 @@ class PiperRobot(Robot):
             "joint7": (0.0, 0.08),  # Example limits for gripper
         }
 
+        # self.home_position = {
+        #     "joint1": 0.0,
+        #     "joint2": 0,
+        #     "joint3": 0,
+        #     "joint4": 0.0,
+        #     "joint5": 1,
+        #     "joint6": 0.0,
+        #     "joint7": 0.0, 
+        # } # In leader arm frame !!!
+        # self.home_position = {
+        #     "joint1": -0.465,
+        #     "joint2": 1.823,
+        #     "joint3": -1.585,
+        #     "joint4": -0.084,
+        #     "joint5": 1.249,
+        #     "joint6": -0.172,
+        #     "joint7": 0.0735, 
+        # } 
         self.home_position = {
-            "joint1": 0.0,
-            "joint2": 0,
-            "joint3": 0,
-            "joint4": 0.0,
+            "joint1": -0.12,
+            "joint2": -0.2,
+            "joint3": 0.2,
+            "joint4": 0,
             "joint5": 1,
-            "joint6": 0.0,
-            "joint7": 0.0,  # Gripper closed position
-        } # In leader arm frame !!!
+            "joint6": -0.08,
+            "joint7": 0.0735, 
+        } 
+
+        #-0.46570246800000004, 1.823107328, -1.58531072, -0.08441151600000002, 1.2499149320000003, -0.17218972400000002, 0.0735
         self.is_homed = False
         self.zero_velocity = {f"{joint}.vel": 0.0 for joint in self.joints}
 
