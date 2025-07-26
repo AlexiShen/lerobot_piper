@@ -95,7 +95,6 @@ class SO102Leader(Teleoperator):
             calibration=self.calibration,
         )
         # if self.bus.is_calibrated:
-        self.trigger_limits = (-1, 1)
         
         
         self.joint_limits = {
@@ -138,12 +137,7 @@ class SO102Leader(Teleoperator):
             # else:
             #     logger.info(f"Calibration file does not exist at {calibration_file}.")
             self.calibrate()
-            trigger_min = self.bus.calibration["joint7"].range_min
-            trigger_max = self.bus.calibration["joint7"].range_max
-            trigger_mid = (trigger_min + trigger_max) / 2
-            max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
-            self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
-                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
+            
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -210,13 +204,23 @@ class SO102Leader(Teleoperator):
         #     input(f"Connect the controller board to the '{motor}' motor only and press enter.")
         #     self.bus.setup_motor(motor)
         #     print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
+    
+    def _get__trigger_limits(self):
+            trigger_min = self.bus.calibration["joint7"].range_min
+            trigger_max = self.bus.calibration["joint7"].range_max
+            trigger_mid = (trigger_min + trigger_max) / 2
+            max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
+            trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
+                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
+            return trigger_limits
 
     def get_action(self) -> dict[str, float]:
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
-        action["joint7.pos"] = (action["joint7.pos"] - self.trigger_limits[0]) \
-            / (self.trigger_limits[1] - self.trigger_limits[0]) * 0.08
+        action["joint7.pos"] = (action["joint7.pos"] - self._get__trigger_limits()[0]) \
+            / (self._get__trigger_limits()[1] - self._get__trigger_limits()[0]) * 0.08
+        print(action["joint7.pos"], self._get__trigger_limits()[0], self._get__trigger_limits()[1])
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
