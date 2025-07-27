@@ -34,6 +34,10 @@ python -m lerobot.teleoperate --robot.type=piper_robot --teleop.type=so102_leade
 
 import logging
 import time
+import sys
+import select
+import termios
+import tty
 from dataclasses import asdict, dataclass
 from pprint import pformat
 
@@ -65,6 +69,25 @@ from lerobot.common.utils.visualization_utils import _init_rerun
 from .common.teleoperators import koch_leader, so100_leader, so101_leader, so102_leader # noqa: F401
 
 
+def check_key_press():
+    """Check if a key is pressed without blocking (Linux only)"""
+    if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
+        return sys.stdin.read(1)
+    return None
+
+
+def setup_terminal():
+    """Setup terminal for non-blocking input"""
+    old_settings = termios.tcgetattr(sys.stdin)
+    tty.setraw(sys.stdin.fileno())
+    return old_settings
+
+
+def restore_terminal(old_settings):
+    """Restore terminal settings"""
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+
 @dataclass
 class TeleoperateConfig:
     teleop: TeleoperatorConfig
@@ -82,10 +105,21 @@ def teleop_loop(
     # display_len = max(len(key) for key in robot.action_features)
     display_len = max(len(key) for key in teleop.action_features)
     start = time.perf_counter()
+    
+    # Setup terminal for non-blocking input
+    
+
+    
     while True:
         if rospy.is_shutdown():
             break
         loop_start = time.perf_counter()
+        
+        # Check for 'h' key press
+        key = check_key_press()
+        if key == 'h':
+            teleop.lead_to_home()
+        
         action = teleop.get_action()
         load = teleop.get_load()
         velocity = teleop.get_velocity()
@@ -93,10 +127,10 @@ def teleop_loop(
         is_robot_homed = robot.home()
         # print(f"Robot is homed: {is_robot_homed}")
         if is_robot_homed:
-            if_arms_synced = teleop.sync_leader_position()
+            if_arm_ready = teleop.if_arm_ready()
             effort_to_send = teleop.send_force_feedback(observation, effort)
-            print(f"if_arms_synced: {if_arms_synced} | is_robot_homed: {is_robot_homed}")
-            if if_arms_synced:
+            print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
+            if if_arm_ready:
                 action_sent = robot.send_action(action, effort_to_send)
         # effort= {
         #     "joint1.effort": 0,
@@ -114,7 +148,7 @@ def teleop_loop(
         # action_sent = robot.send_action(zero_action)
 
 
-         # if display_data:
+        # if display_data:
         #     observation = robot.get_observation()
         #     for obs, val in observation.items():
         #         if isinstance(val, float):
@@ -139,9 +173,11 @@ def teleop_loop(
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
-            return
+            break
 
         # move_cursor_up(len(action)+ 8)
+
+        
 
 
 @draccus.wrap()
@@ -156,16 +192,19 @@ def teleoperate(cfg: TeleoperateConfig):
 
     teleop.connect()
     robot.connect()
+    old_settings = setup_terminal()
     try:
+        
         teleop_loop(teleop, robot, cfg.fps, display_data=cfg.display_data, duration=cfg.teleop_time_s)
     except KeyboardInterrupt:
-        pass
+        print("\nTeleoperation interrupted by user")
     finally:
         if cfg.display_data:
             rr.rerun_shutdown()
         teleop.disconnect()
         robot.disconnect()
         rospy.signal_shutdown("User requested shutdown")
+        restore_terminal(old_settings)
 
 
 if __name__ == "__main__":

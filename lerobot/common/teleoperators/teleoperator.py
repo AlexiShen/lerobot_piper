@@ -124,8 +124,13 @@ class Teleoperator(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def sync_leader_position(self) -> None:
+    def if_arm_ready(self) -> None:
         """Syncs the teleoperator position to the robot observation."""
+        pass
+
+    @abc.abstractmethod
+    def lead_to_home(self) -> None:
+        """Moves the teleoperator to the home position."""
         pass
 
     @abc.abstractmethod
