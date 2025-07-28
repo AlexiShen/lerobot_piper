@@ -117,8 +117,20 @@ class SO102Leader(Teleoperator):
             "joint6": -0.08,
             "joint7": 0.0735, 
         }
+
+        self.rest_positions = {
+            "joint1": 0,
+            "joint2": -1.69,
+            "joint3": 1.61,
+            "joint4": 0,
+            "joint5": 0.55,
+            "joint6": -0.1,
+            "joint7": 0.0, 
+        }
         
         self.is_homed = True
+        self.is_going_to_rest = False
+        self.position_reached = False
 
 
         self.if_synced = False
@@ -340,6 +352,9 @@ class SO102Leader(Teleoperator):
             tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
         else:
             tau_joint = self._lead_to_home(action, velocity)
+        if self.is_going_to_rest:
+            tau_joint = self._lead_to_position(action, velocity, self.rest_positions)
+            self.is_going_to_rest = not self.position_reached
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
         tau =  tau_vf + tau_g + tau_joint + tau_trigger + tau_ss 
@@ -454,7 +469,7 @@ class SO102Leader(Teleoperator):
         print("Moving leader arm to home position...")
 
     def _lead_to_home(self, action, velocity):
-        Kp = [1, 5, 7, 3, 3, 3, 3]
+        Kp = [1, 5, 7, 3, 3, 3, 1]
         Kd = 0.03 * np.ones_like(Kp)
         Ki = 0 * np.ones_like(Kp)
         tau_joint = np.zeros(7)
@@ -465,6 +480,32 @@ class SO102Leader(Teleoperator):
             self.is_homed = True
         for i, q_leader_val in enumerate(q):
             joint_diff = q_leader_val - q_home[i]
+            if np.abs(joint_diff) > 0.01:
+                tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] 
+                # self.joint_integrals[i] += joint_diff * 0.2
+                # if self.joint_integrals[i] > 0.5:
+                #     self.joint_integrals[i] = 0.5
+                # elif self.joint_integrals[i] < -0.5:
+                #     self.joint_integrals[i] = -0.5
+            else:
+                tau_joint[i] = 0
+
+        return tau_joint
+
+    def lead_to_rest(self):
+        self.is_going_to_rest = True
+
+    def _lead_to_position(self, action, velocity, target):
+        Kp = [1, 5, 7, 3, 3, 3, 1]
+        Kd = 0.03 * np.ones_like(Kp)
+        Ki = 0 * np.ones_like(Kp)
+        tau_joint = np.zeros(7)
+        q = np.array([action[f"{joint}.pos"] for joint in self.bus.motors.keys()])
+        q_dot = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
+        target_q = np.array([target[f"{joint}"] for joint in self.bus.motors.keys()])
+        self.position_reached = self._check_if_synced(q, target_q, q_dot)
+        for i, q_leader_val in enumerate(q):
+            joint_diff = q_leader_val - target_q[i]
             if np.abs(joint_diff) > 0.01:
                 tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] 
                 # self.joint_integrals[i] += joint_diff * 0.2

@@ -115,6 +115,8 @@ def teleop_loop(
         key = check_key_press()
         if key == 'h':
             teleop.lead_to_home()
+        elif key == 'r':
+            teleop.lead_to_rest()
         
         action = teleop.get_action()
         load = teleop.get_load()
@@ -198,6 +200,47 @@ def teleop_loop(
 
         # move_cursor_up(len(action)+ 8)
 
+# def shutdown_loop(
+#         teleop: Teleoperator, robot: Robot, fps: int, display_data: bool = False, duration: float | None = None
+# ):  
+#     while True:
+#         loop_start = time.perf_counter()
+#         print("Shutting down teleoperation loop...")
+#         action = teleop.get_action()
+#         load = teleop.get_load()
+#         velocity = teleop.get_velocity()
+#         observation, effort = robot.get_observation()
+#         if teleop.lead_to_rest(action, velocity):
+#             break
+#         effort_to_send = teleop.send_force_feedback(observation, effort)
+#         action_sent = robot.send_action(action, effort_to_send)
+
+#         dt_s = time.perf_counter() - loop_start
+#         busy_wait(1 / fps - dt_s)
+
+#         loop_s = time.perf_counter() - loop_start
+
+#         col_widths = [16, 10, 10, 10, 10, 10]
+#         header_fields = ["NAME", "ACTION", "LOAD", "VELOCITY", "OBSERV", "EFFORT"]
+#         header = " | ".join(f"{name:<{w}}" for name, w in zip(header_fields, col_widths))
+#         print('-' * len(header))
+#         print(header)
+#         print('-' * len(header))
+#         for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val), (joint2, eff_val) in zip(
+#             load.items(), action.items(), velocity.items(), observation.items(), effort.items()
+#         ):
+#             print(
+#                 f"{motor:<{col_widths[0]}} | "
+#                 f"{action_val:>{col_widths[1]}.2f} | "
+#                 f"{load_val:>{col_widths[2]}.2f} | "
+#                 f"{velocity_val:>{col_widths[3]}.2f} | "
+#                 f"{obs_val:>{col_widths[4]}.2f} | "
+#                 f"{eff_val:>{col_widths[5]}.2f}"
+#             )
+#         print('-' * len(header))
+#         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+
+            
         
 
 

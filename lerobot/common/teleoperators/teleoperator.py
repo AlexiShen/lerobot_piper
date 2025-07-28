@@ -134,6 +134,11 @@ class Teleoperator(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def lead_to_rest(self) -> None:
+        """Moves the teleoperator to the rest position."""
+        pass
+
+    @abc.abstractmethod
     def disconnect(self) -> None:
         """Disconnects from the teleoperator."""
         pass
