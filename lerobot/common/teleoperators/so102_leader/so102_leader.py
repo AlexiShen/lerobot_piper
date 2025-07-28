@@ -95,6 +95,7 @@ class SO102Leader(Teleoperator):
             calibration=self.calibration,
         )
         # if self.bus.is_calibrated:
+        self.trigger_limits = (-1, 1)
         
         
         self.joint_limits = {
@@ -106,6 +107,19 @@ class SO102Leader(Teleoperator):
             "joint6": (-1.745, 1.745),
             "joint7": (0.0, 0.08),  # Example limits for gripper
         }
+
+        self.home_positions = {
+            "joint1": -0.12,
+            "joint2": -0.2,
+            "joint3": 0.2,
+            "joint4": 0,
+            "joint5": 1,
+            "joint6": -0.08,
+            "joint7": 0.0735, 
+        }
+        self.is_homed = True
+
+
         self.if_synced = False
         self.joint_integrals = np.zeros(6)
 
@@ -137,7 +151,12 @@ class SO102Leader(Teleoperator):
             # else:
             #     logger.info(f"Calibration file does not exist at {calibration_file}.")
             self.calibrate()
-            
+            trigger_min = self.bus.calibration["joint7"].range_min
+            trigger_max = self.bus.calibration["joint7"].range_max
+            trigger_mid = (trigger_min + trigger_max) / 2
+            max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
+            self.trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
+                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -204,23 +223,13 @@ class SO102Leader(Teleoperator):
         #     input(f"Connect the controller board to the '{motor}' motor only and press enter.")
         #     self.bus.setup_motor(motor)
         #     print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
-    
-    def _get__trigger_limits(self):
-            trigger_min = self.bus.calibration["joint7"].range_min
-            trigger_max = self.bus.calibration["joint7"].range_max
-            trigger_mid = (trigger_min + trigger_max) / 2
-            max_res = self.bus.model_resolution_table[self.bus._id_to_model(7)] - 1
-            trigger_limits = ((trigger_min - trigger_mid)/max_res * 2*np.pi, \
-                                (trigger_max - trigger_mid)/max_res * 2*np.pi)
-            return trigger_limits
 
     def get_action(self) -> dict[str, float]:
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
         action = {f"{motor}.pos": val for motor, val in action.items()}
-        action["joint7.pos"] = (action["joint7.pos"] - self._get__trigger_limits()[0]) \
-            / (self._get__trigger_limits()[1] - self._get__trigger_limits()[0]) * 0.08
-        print(action["joint7.pos"], self._get__trigger_limits()[0], self._get__trigger_limits()[1])
+        action["joint7.pos"] = (action["joint7.pos"] - self.trigger_limits[0]) \
+            / (self.trigger_limits[1] - self.trigger_limits[0]) * 0.08
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         valid_joints = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
@@ -261,13 +270,13 @@ class SO102Leader(Teleoperator):
     #     self.if_synced = local_sync_flag
     #     return local_sync_flag
 
-    def sync_leader_position(self):
+    def if_arm_ready(self):
         return self.if_synced
     
     def _check_if_synced(self, q_leader, q_follower, q_dot):
         for i in range(len(q_leader)):
             joint_diff = q_leader[i] - q_follower[i]
-            if np.abs(joint_diff) > 0.05 or (np.abs(q_dot[i]) > 0.1):
+            if np.abs(joint_diff) > 0.2 or (np.abs(q_dot[i]) > 0.1):
                 return False
         return True
 
@@ -322,7 +331,10 @@ class SO102Leader(Teleoperator):
         tau_g = self._compute_gravity_compensation(q, q_dot)
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
-        tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
+        if self.is_homed:
+            tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
+        else:
+            tau_joint = self._lead_to_home(action, velocity)
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
         tau =  tau_vf + tau_g + tau_joint + tau_trigger + tau_ss 
@@ -370,8 +382,8 @@ class SO102Leader(Teleoperator):
         q_threshold = 0.1
         # uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
         # uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.3]
-        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.3]
+        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
+        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:
         #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
         #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
@@ -381,7 +393,7 @@ class SO102Leader(Teleoperator):
         return tau_vf * -1
     
     def _compute_joint_diff_compensation(self, q_leader, q_dot, q_follower, valid_joints):
-        Kp = [5, 20, 20, 3, 8, 3]
+        Kp = [1, 5, 7, 3, 3, 3]
         Kd = 0.03 * np.ones_like(Kp)
         Ki = 0 * np.ones_like(Kp)
         tau_joint = np.zeros_like(q_leader)
@@ -394,15 +406,15 @@ class SO102Leader(Teleoperator):
             # print(f"Joint {valid_joints[i]} diff: {joint_diff:.3f}, integral: {self.joint_integrals[i]:.3f}, tau_joint: {tau_joint[i]:.3f}")
             if np.abs(joint_diff) > 0.01 and (np.abs(q_leader_val) > self.joint_limits[valid_joints[i]][1] or not self.if_synced):
                 tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
-                self.joint_integrals[i] += joint_diff 
-                if self.joint_integrals[i] > 50:
-                    self.joint_integrals[i] = 50
-                elif self.joint_integrals[i] < -50:
-                    self.joint_integrals[i] = -50
+                self.joint_integrals[i] += joint_diff * 0.2
+                if self.joint_integrals[i] > 0.5:
+                    self.joint_integrals[i] = 0.5
+                elif self.joint_integrals[i] < -0.5:
+                    self.joint_integrals[i] = -0.5
             else:
                 self.joint_integrals[i] = 0
                 tau_joint[i] = 0
-        # print(f"Joint integrals: {self.joint_integrals}")
+        
         # self.if_synced = if_synced_local_flag
         # print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)
@@ -431,6 +443,34 @@ class SO102Leader(Teleoperator):
             gripper_effort_to_send = -self.gripper_effort_limit
         print(f"Gripper force: {gripper_effort_to_send}, trigger_pos: {trigger_pos}, gripper_pos: {gripper_pos}, trigger_tau: {trigger_tau}")
         return tau, gripper_effort_to_send
+    
+    def lead_to_home(self):
+        self.is_homed = False
+
+    def _lead_to_home(self, action, velocity):
+        Kp = [1, 5, 7, 3, 3, 3]
+        Kd = 0.03 * np.ones_like(Kp)
+        Ki = 0 * np.ones_like(Kp)
+        tau_joint = np.zeros(7)
+        q = np.array([action[f"{joint}.pos"] for joint in self.bus.motors.keys()])
+        q_dot = np.array([velocity[f"{joint}.vel"] for joint in self.bus.motors.keys()])
+        q_home = np.array([self.home_positions[f"{joint}"] for joint in self.bus.motors.keys()])
+        if self._check_if_synced(q, q_home, q_dot):
+            self.is_homed = True
+        for i, q_leader_val in enumerate(q):
+            joint_diff = q_leader_val - q_home[i]
+            if np.abs(joint_diff) > 0.01:
+                tau_joint[i] = Kp[i] * joint_diff - Kd[i] * q_dot[i] + Ki[i] * self.joint_integrals[i]
+                # self.joint_integrals[i] += joint_diff * 0.2
+                # if self.joint_integrals[i] > 0.5:
+                #     self.joint_integrals[i] = 0.5
+                # elif self.joint_integrals[i] < -0.5:
+                #     self.joint_integrals[i] = -0.5
+            else:
+                self.joint_integrals[i] = 0
+                tau_joint[i] = 0
+
+        return tau_joint
 
     def _safe_guard_torque(self, tau):
         """
