@@ -37,6 +37,7 @@ import time
 import sys
 import select
 import termios
+import os
 import tty
 from dataclasses import asdict, dataclass
 from pprint import pformat
@@ -69,24 +70,19 @@ from lerobot.common.utils.visualization_utils import _init_rerun
 from .common.teleoperators import koch_leader, so100_leader, so101_leader, so102_leader # noqa: F401
 
 
-def check_key_press():
-    """Check if a key is pressed without blocking (Linux only)"""
-    if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
-        return sys.stdin.read(1)
-    return None
-
-
 def setup_terminal():
-    """Setup terminal for non-blocking input"""
     old_settings = termios.tcgetattr(sys.stdin)
-    tty.setraw(sys.stdin.fileno())
+    tty.setcbreak(sys.stdin.fileno())
     return old_settings
 
-
 def restore_terminal(old_settings):
-    """Restore terminal settings"""
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
+def check_key_press():
+    dr, _, _ = select.select([sys.stdin], [], [], 0)
+    if dr:
+        return sys.stdin.read(1)
+    return None
 
 @dataclass
 class TeleoperateConfig:
@@ -108,7 +104,7 @@ def teleop_loop(
     
     # Setup terminal for non-blocking input
     
-
+    
     
     while True:
         if rospy.is_shutdown():
@@ -129,7 +125,7 @@ def teleop_loop(
         if is_robot_homed:
             if_arm_ready = teleop.if_arm_ready()
             effort_to_send = teleop.send_force_feedback(observation, effort)
-            print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
+            # print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
             if if_arm_ready:
                 action_sent = robot.send_action(action, effort_to_send)
         # effort= {
@@ -164,12 +160,37 @@ def teleop_loop(
         loop_s = time.perf_counter() - loop_start
 
         # print(observation.__sizeof__())
-        print("\n" + "-" * (display_len + 10))
-        print(f"{'NAME':<{display_len}} | {'ACTION':>7} | {'EFFORT':>7} | {'VELOCITY':>7} | {'OBSERVATION':>7} | {'EFFORT':>7}")
-        for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val) , (joint2, eff_val)\
-            in zip(load.items(), action.items(), velocity.items(), observation.items(), effort.items()):
-            print(f"{motor:<{display_len}} | {action_val:>7.2f} | {load_val:>7.2f} | {velocity_val:>7.2f} | {obs_val:>7.2f} | {eff_val:>7.2f}")
+        # os.system('clear')
+        # # print("\n" + "-" * (display_len + 10))
+        # # print(f"{'NAME':<{display_len}} | {'ACTION':>7} | {'EFFORT':>7} | {'VELOCITY':>7} | {'OBSERVATION':>7} | {'EFFORT':>7}")
+        # col_width = 12
+        # header = f"{'NAME':<{col_width}} | {'ACTION':>7} | {'EFFORT':>7} | {'VELOCITY':>9} | {'OBSERV':>9} | {'EFFORT':>7}"
+        # print('-' * len(header))
+        # print(header)
+        # for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val) , (joint2, eff_val)\
+        #     in zip(load.items(), action.items(), velocity.items(), observation.items(), effort.items()):
+        #     print(f"{motor:<{display_len}} | {action_val:>7.2f} | {load_val:>7.2f} | {velocity_val:>7.2f} | {obs_val:>7.2f} | {eff_val:>7.2f}")
         
+        # print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+        # os.system('clear')
+        col_widths = [16, 10, 10, 10, 10, 10]
+        header_fields = ["NAME", "ACTION", "LOAD", "VELOCITY", "OBSERV", "EFFORT"]
+        header = " | ".join(f"{name:<{w}}" for name, w in zip(header_fields, col_widths))
+        print('-' * len(header))
+        print(header)
+        print('-' * len(header))
+        for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val), (joint2, eff_val) in zip(
+            load.items(), action.items(), velocity.items(), observation.items(), effort.items()
+        ):
+            print(
+                f"{motor:<{col_widths[0]}} | "
+                f"{action_val:>{col_widths[1]}.2f} | "
+                f"{load_val:>{col_widths[2]}.2f} | "
+                f"{velocity_val:>{col_widths[3]}.2f} | "
+                f"{obs_val:>{col_widths[4]}.2f} | "
+                f"{eff_val:>{col_widths[5]}.2f}"
+            )
+        print('-' * len(header))
         print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
 
         if duration is not None and time.perf_counter() - start >= duration:
