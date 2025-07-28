@@ -80,16 +80,17 @@ class PiperRobot(Robot):
         #     "joint7": 0.0, 
         # } # In leader arm frame !!!
         # self.home_position = {
-        #     "joint1": -0.465,
-        #     "joint2": 1.823,
-        #     "joint3": -1.585,
-        #     "joint4": -0.084,
-        #     "joint5": 1.249,
-        #     "joint6": -0.172,
-        #     "joint7": 0.0735, 
+        #     "joint1": -0.71,
+        #     "joint2": 0.01,
+        #     "joint3": 0.33,
+        #     "joint4": -0.01,
+        #     "joint5": 1.23,
+        #     "joint6": 0.34,
+        #     "joint7": 0.07, 
         # } 
+        
         self.home_position = {
-            "joint1": -0.12,
+            "joint1": -0.12,   # -0.12 rad
             "joint2": -0.2,
             "joint3": 0.2,
             "joint4": 0,
