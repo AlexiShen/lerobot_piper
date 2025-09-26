@@ -28,7 +28,7 @@ from lerobot.common.motors.feetech import (
 )
 
 from ..teleoperator import Teleoperator
-from .config_kuka_leader import SO102LeaderConfig
+from .config_kuka_leader import KUKALeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
@@ -43,15 +43,15 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-class SO102Leader(Teleoperator):
+class KukaLeader(Teleoperator):
     """
-    SO-102 Leader Arm inspired by SO-101 designed by TheRobotStudio and Hugging Face.
+    Kuka Leader Arm for teleoperation.
     """
 
-    config_class = SO102LeaderConfig
-    name = "so102_leader"
+    config_class = KUKALeaderConfig
+    name = "kuka_leader"
 
-    def __init__(self, config: SO102LeaderConfig):
+    def __init__(self, config: KUKALeaderConfig):
         # Ensure calibration_dir is a Path before calling super().__init__
         if config.calibration_dir is None:
             config.calibration_dir = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -59,14 +59,14 @@ class SO102Leader(Teleoperator):
             config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
         urdf_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-        urdf_path = urdf_dir / "Leader_arm_links.SLDASM/urdf"#"so102_description.urdf"
+        urdf_path = urdf_dir / "description/kuka_description.urdf"  # Update this path as needed
         # self.builder = DiagramBuilder()
         # self.plant = MultibodyPlant(time_step=0.0)
-        # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM_old_convention.urdf")
+        # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/kuka_leader/description/kuka_description.urdf")
         # self.plant.Finalize()
         # self.context = self.plant.CreateDefaultContext()
-        self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM.urdf")
-        # self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/so102_description.urdf")
+        self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/kuka_leader/description/kuka_description.urdf")
+        # Alternative: self.model = pin.buildModelFromUrdf(str(urdf_path))
         self.data = self.model.createData()
         self.config = config
 
@@ -199,9 +199,9 @@ class SO102Leader(Teleoperator):
                 range_max=range_maxes[motor],
             )
 
-        # Save calibration file in the SO102Leader directory
+        # Save calibration file in the KukaLeader directory
         self.bus.write_calibration(self.calibration)
-        # calibration_fpath = self.calibration_dir / f"{self.id}_so102_calibration.json"
+        # calibration_fpath = self.calibration_dir / f"{self.id}_kuka_calibration.json"
         # self._save_calibration(fpath=calibration_fpath)
         # logger.info(f"Calibration saved to {calibration_fpath}")
         self._save_calibration()
