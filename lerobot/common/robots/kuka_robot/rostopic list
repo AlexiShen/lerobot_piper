@@ -1,0 +1,112 @@
+(base) qzshen@qzshen-Blade-15-Mid-2019-Base:~/kuka_arm$ rostopic list
+/arm_controller/command
+/arm_controller/follow_joint_trajectory/cancel
+/arm_controller/follow_joint_trajectory/feedback
+/arm_controller/follow_joint_trajectory/goal
+/arm_controller/follow_joint_trajectory/result
+/arm_controller/follow_joint_trajectory/status
+/arm_controller/state
+/attached_collision_object
+/clock
+/collision_object
+/execute_trajectory/cancel
+/execute_trajectory/feedback
+/execute_trajectory/goal
+/execute_trajectory/result
+/execute_trajectory/status
+/gazebo/link_states
+/gazebo/model_states
+/gazebo/parameter_descriptions
+/gazebo/parameter_updates
+/gazebo/performance_metrics
+/gazebo/set_link_state
+/gazebo/set_model_state
+/joint_states
+/link_1_controller/command
+/link_2_controller/command
+/link_3_controller/command
+/link_4_controller/command
+/link_5_controller/command
+/link_6_controller/command
+/link_e_controller/command
+/move_group/cancel
+/move_group/display_contacts
+/move_group/display_planned_path
+/move_group/feedback
+/move_group/goal
+/move_group/monitored_planning_scene
+/move_group/ompl/parameter_descriptions
+/move_group/ompl/parameter_updates
+/move_group/plan_execution/parameter_descriptions
+/move_group/plan_execution/parameter_updates
+/move_group/planning_scene_monitor/parameter_descriptions
+/move_group/planning_scene_monitor/parameter_updates
+/move_group/result
+/move_group/sense_for_plan/parameter_descriptions
+/move_group/sense_for_plan/parameter_updates
+/move_group/status
+/move_group/trajectory_execution/parameter_descriptions
+/move_group/trajectory_execution/parameter_updates
+/pickup/cancel
+/pickup/feedback
+/pickup/goal
+/pickup/result
+/pickup/status
+/place/cancel
+/place/feedback
+/place/goal
+/place/result
+/place/status
+/planning_scene
+/planning_scene_world
+/recognized_object_array
+/rosout
+/rosout_agg
+/rviz_moveit_motion_planning_display/robot_interaction_interactive_marker_topic/feedback
+/rviz_moveit_motion_planning_display/robot_interaction_interactive_marker_topic/update
+/rviz_moveit_motion_planning_display/robot_interaction_interactive_marker_topic/update_full
+/rviz_qzshen_Blade_15_Mid_2019_Base_32604_7154614421241305212/motionplanning_planning_scene_monitor/parameter_descriptions
+/rviz_qzshen_Blade_15_Mid_2019_Base_32604_7154614421241305212/motionplanning_planning_scene_monitor/parameter_updates
+/tf
+/tf_static
+/trajectory_execution_event
+
+/joint_states:
+---
+header: 
+  seq: 816894
+  stamp: 
+    secs: 820
+    nsecs: 209000000
+  frame_id: ''
+name: 
+  - joint_a1
+  - joint_a2
+  - joint_a3
+  - joint_a4
+  - joint_a5
+  - joint_a6
+  - linear_axis_joint_e1
+position: [-4.9900033386229836e-05, -0.08723509894108705, 6.946035212873625e-05, 0.0001383084335424556, 4.742762881093654e-06, 1.628870284964279e-05, -3.0000100433935684]
+velocity: [6.149591153196327e-05, 0.03140105891492083, 0.03473020081392371, 0.00014190735396062127, 0.0023713850945577125, 0.00012266641484307448, -4.3393568276378506e-05]
+effort: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+---
+header: 
+  seq: 816895
+  stamp: 
+    secs: 820
+    nsecs: 210000000
+  frame_id: ''
+name: 
+  - joint_a1
+  - joint_a2
+  - joint_a3
+  - joint_a4
+  - joint_a5
+  - joint_a6
+  - linear_axis_joint_e1
+position: [-4.9900033386229836e-05, -0.08723509894108794, 6.946035212962443e-05, 0.0001383084335424556, 4.742762881093654e-06, 1.628870284964279e-05, -3.0000100433935684]
+velocity: [6.149591153342412e-05, 0.031401058914917276, 0.0347302008139197, 0.00014190735396041697, 0.002371385094557657, 0.00012266641484296847, -4.3393568276410564e-05]
+effort: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+---
+

@@ -50,6 +50,7 @@ from lerobot.common.teleoperators import (
     TeleoperatorConfig,
     make_teleoperator_from_config,
     so102_leader,
+    kuka_leader,
 )
 from lerobot.common.utils.robot_utils import busy_wait
 from lerobot.common.utils.utils import init_logging, move_cursor_up
@@ -58,8 +59,8 @@ from lerobot.common.utils.visualization_utils import _init_rerun
 
 @dataclass
 class TeleoperateOnlyConfig:
-    #teleop: TeleoperatorConfig
-    teleop: so102_leader.SO102LeaderConfig
+    # teleop: TeleoperatorConfig
+    teleop: TeleoperatorConfig  # Accepts any teleoperator config, e.g., SO102LeaderConfig or KUKALeaderConfig
     fps: int = 60
     teleop_time_s: float | None = None
     display_data: bool = False

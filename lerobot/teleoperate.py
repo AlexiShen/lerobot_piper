@@ -57,6 +57,7 @@ from lerobot.common.robots import (  # noqa: F401
     so100_follower,
     so101_follower,
     piper_robot,
+    kuka_robot,
 )
 from lerobot.common.teleoperators import (
     Teleoperator,

@@ -32,8 +32,8 @@ from .config_kuka_leader import KUKALeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
-from pinocchio.utils import rotate
-from pinocchio.visualize import MeshcatVisualizer
+from scipy.spatial.transform import Rotation
+# from pinocchio.visualize import MeshcatVisualizer
 import meshcat
 from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
 import scipy.spatial.transform
@@ -579,7 +579,7 @@ class KukaLeader(Teleoperator):
             MeshLambertMaterial(color=0x0000ff)
         )
         # Transform so it starts at origin and points along Z
-        R = rotate('x', -np.pi/2)
+        R = Rotation.from_euler('x', -np.pi/2).as_matrix()
         t = np.zeros(3)
         T_comp = pin.SE3(R, t)
         T = placement * T_comp#* pin.SE3(np.eye(3), np.array([0, 0, length / 2]))
