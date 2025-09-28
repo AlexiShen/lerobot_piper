@@ -51,6 +51,7 @@ from lerobot.common.teleoperators import (  # noqa: F401
     so100_leader,
     so101_leader,
     so102_leader,  # Added so102_leader
+    kuka_leader,  # Added kuka_leader
 )
 from lerobot.common.utils.utils import init_logging
 

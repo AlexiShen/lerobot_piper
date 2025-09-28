@@ -37,6 +37,10 @@ def make_teleoperator_from_config(config: TeleoperatorConfig) -> Teleoperator:
         from .so102_leader import SO102Leader
 
         return SO102Leader(config)
+    elif config.type == "kuka_leader":
+        from .kuka_leader import KukaLeader
+
+        return KukaLeader(config)
     elif config.type == "stretch3":
         from .stretch3_gamepad import Stretch3GamePad
 

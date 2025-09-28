@@ -32,8 +32,12 @@ from .config_so102_leader import SO102LeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
-from pinocchio.utils import rotate
-from pinocchio.visualize import MeshcatVisualizer
+from pinocchio.utils import rotate  # Now available with proper pinocchio
+try:
+    from pinocchio.visualize import MeshcatVisualizer
+except ImportError:
+    # Fallback if MeshcatVisualizer is not available
+    MeshcatVisualizer = None
 import meshcat
 from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
 import scipy.spatial.transform

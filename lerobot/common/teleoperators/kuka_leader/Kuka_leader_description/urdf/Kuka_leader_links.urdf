@@ -86,7 +86,7 @@
   </link>
   <joint
     name="Joint1"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.00056321 0 0.064537"
       rpy="0 0.0087266 0" />
@@ -96,6 +96,11 @@
       link="Link1" />
     <axis
       xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
   <link
     name="Link2">
@@ -139,7 +144,7 @@
   </link>
   <joint
     name="Joint2"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="9.9432E-05 -0.00048779 0.054336"
       rpy="1.8125 1.5343 -2.9" />
@@ -149,6 +154,11 @@
       link="Link2" />
     <axis
       xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
   <link
     name="Link3">
@@ -203,10 +213,10 @@
     <axis
       xyz="0 0 1" />
     <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
   <link
     name="Link4">
@@ -248,9 +258,9 @@
       </geometry>
     </collision>
   </link>
-  <joint
+   <joint
     name="Joint4"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.10556 0 0.0011"
       rpy="-1.5708 1.5523 -1.5708" />
@@ -260,6 +270,11 @@
       link="Link4" />
     <axis
       xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
   <link
     name="Link5">
@@ -314,10 +329,10 @@
     <axis
       xyz="0 0 1" />
     <limit
-      lower="0"
-      upper="0"
-      effort="0"
-      velocity="0" />
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
   <link
     name="Link6">
@@ -361,7 +376,7 @@
   </link>
   <joint
     name="Joint6"
-    type="continuous">
+    type="revolute">
     <origin
       xyz="0.0615 0 0"
       rpy="-1.5708 1.564 -1.5708" />
@@ -371,5 +386,10 @@
       link="Link6" />
     <axis
       xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="100"
+      velocity="1.0" />
   </joint>
 </robot>

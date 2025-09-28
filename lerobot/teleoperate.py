@@ -123,14 +123,18 @@ def teleop_loop(
         load = teleop.get_load()
         velocity = teleop.get_velocity()
         observation, effort = robot.get_observation()
-        is_robot_homed = robot.home()
+        # is_robot_homed = robot.home()
         # print(f"Robot is homed: {is_robot_homed}")
-        if is_robot_homed:
-            if_arm_ready = teleop.if_arm_ready()
-            effort_to_send = teleop.send_force_feedback(observation, effort)
-            # print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
-            if if_arm_ready:
-                action_sent = robot.send_action(action, effort_to_send)
+        # if is_robot_homed:
+        #     if_arm_ready = teleop.if_arm_ready()
+        #     effort_to_send = teleop.send_force_feedback(observation, effort)
+        #     # print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
+        #     if if_arm_ready:
+        #         action_sent = robot.send_action(action, effort_to_send)
+        effort_to_send = teleop.send_force_feedback(observation, effort)
+        action_sent = robot.send_action(action, effort_to_send)
+        #temporarily cancel homing check for testing
+
         # effort= {
         #     "joint1.effort": 0,
         #     "joint2.effort": -90,
