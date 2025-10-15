@@ -37,16 +37,16 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-class PiperRobot(Robot):
+class KukaRobot(Robot):
 
-    config_class = PiperRobotConfig
-    name = "piper_robot"
+    config_class = KukaRobotConfig
+    name = "kuka_robot"
 
-    def __init__(self, config: PiperRobotConfig):
+    def __init__(self, config: KukaRobotConfig):
         super().__init__(config)
         self.config = config
         self.robot_type = self.config.type
-        self.node_name = f"{self.name}_piper"
+        self.node_name = f"{self.name}_kuka"
         self.is_connected = False
         self.logs = {}
 
@@ -110,12 +110,12 @@ class PiperRobot(Robot):
         # }
 
         self.transform = {
-            "joint_a1": (-1, 0),
-            "joint_a2": (1, 1.55),
-            "joint_a3": (1, -1.63),
-            "joint_a4": (-1, 0),
+            "joint_a1": (1, 0),
+            "joint_a2": (1, -1.64),
+            "joint_a3": (1, 1.51),
+            "joint_a4": (1, 0),
             "joint_a5": (1, 0),
-            "joint_a6": (-1, 0),
+            "joint_a6": (1, 0),
             "linear_axis_joint_e1": (1, 0),
         }
 
@@ -219,31 +219,60 @@ class PiperRobot(Robot):
                 self.current_joint_states.effort if hasattr(self.current_joint_states, 'effort') else [0.0]*len(self.current_joint_states.name)
             ):
                 converted_position = self._convert_observation(name, position)
-                observation[f"{name}.pos"] = converted_position
-                effort[f"{name}.effort"] = effort_val
+                kuka_joint_name = self._convert_joint_name_to_leader_style(name)
+                observation[f"{kuka_joint_name}.pos"] = converted_position
+                effort[f"{kuka_joint_name}.effort"] = effort_val
 
         return observation, effort
 
-    # Convert so102 action to piper action
+    # Convert kuka_leader action to piper action
     # input action should have .pos removed from the keys
     def _convert_action(self, action: dict[str, float]) -> dict[str, float]:
         converted_action = {}
         for joint, value in action.items():
+            # Convert from kuka_leader style to kuka_robot style if needed
+            robot_joint_name = self._convert_joint_name_to_robot_style(joint)
             # print(self.joint_limits)
-            if joint in self.joint_limits:
-                converted_value = value* self.transform[joint][0] + self.transform[joint][1]
-                # so102 joint angles [rad] converted to piper joint angles [rad]
-                min_limit, max_limit = self.joint_limits[joint]
+            if robot_joint_name in self.joint_limits:
+                converted_value = value* self.transform[robot_joint_name][0] + self.transform[robot_joint_name][1]
+                # kuka_leader joint angles [rad] converted to piper joint angles [rad]
+                min_limit, max_limit = self.joint_limits[robot_joint_name]
                 # Ensure the value is within the joint limits
                 safe_value = self._ensure_safe_goal_position(converted_value, min_limit, max_limit)
-                converted_action[joint] = safe_value
+                converted_action[robot_joint_name] = safe_value
             else:
-                raise ValueError(f"Joint {joint} not recognized in limits.")
+                raise ValueError(f"Joint {joint} (robot style: {robot_joint_name}) not recognized in limits.")
         return converted_action
     
     def _convert_observation(self, name, value):
         converted_value = value * self.transform[name][0] - self.transform[name][1]
         return converted_value
+    
+    def _convert_joint_name_to_leader_style(self, ros_joint_name):
+        """Convert ROS joint names to kuka_leader style"""
+        joint_name_mapping = {
+            "joint_a1": "joint1",
+            "joint_a2": "joint2", 
+            "joint_a3": "joint3",
+            "joint_a4": "joint4",
+            "joint_a5": "joint5",
+            "joint_a6": "joint6",
+            "linear_axis_joint_e1": "joint7"
+        }
+        return joint_name_mapping.get(ros_joint_name, ros_joint_name)
+    
+    def _convert_joint_name_to_robot_style(self, leader_joint_name):
+        """Convert kuka_leader joint names back to ROS/kuka_robot style"""
+        reverse_joint_name_mapping = {
+            "joint1": "joint_a1",
+            "joint2": "joint_a2",
+            "joint3": "joint_a3", 
+            "joint4": "joint_a4",
+            "joint5": "joint_a5",
+            "joint6": "joint_a6",
+            "joint7": "linear_axis_joint_e1"
+        }
+        return reverse_joint_name_mapping.get(leader_joint_name, leader_joint_name)
 
     def _ensure_safe_goal_position(self, value: float, min_limit: float, max_limit: float) -> float:
         """
@@ -291,9 +320,12 @@ class PiperRobot(Robot):
         observation, effort = self.get_observation()
         observation = {key.removesuffix(".pos"): val for key, val in observation.items()}
         for joint, value in observation.items():
-            error = value - self.home_position[joint]
-            if abs(error) > 0.15:
-                return False
+            # Convert kuka_leader joint name to robot style for home_position lookup
+            robot_joint = self._convert_joint_name_to_robot_style(joint)
+            if robot_joint in self.home_position:
+                error = value - self.home_position[robot_joint]
+                if abs(error) > 0.15:
+                    return False
         return True
 
     

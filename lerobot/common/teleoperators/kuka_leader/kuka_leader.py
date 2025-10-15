@@ -32,8 +32,8 @@ from .config_kuka_leader import KUKALeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
-from scipy.spatial.transform import Rotation
-# from pinocchio.visualize import MeshcatVisualizer
+from pinocchio.utils import rotate  # Now available with proper pinocchio
+from pinocchio.visualize import MeshcatVisualizer
 import meshcat
 from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
 import scipy.spatial.transform
@@ -59,13 +59,13 @@ class KukaLeader(Teleoperator):
             config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
         urdf_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-        urdf_path = urdf_dir / "description/kuka_description.urdf"  # Update this path as needed
+        urdf_path = urdf_dir / "Kuka_leader_description/urdf/Kuka_leader_links.urdf"
         # self.builder = DiagramBuilder()
         # self.plant = MultibodyPlant(time_step=0.0)
         # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/kuka_leader/description/kuka_description.urdf")
         # self.plant.Finalize()
         # self.context = self.plant.CreateDefaultContext()
-        self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/kuka_leader/description/kuka_description.urdf")
+        self.model = pin.buildModelFromUrdf(str(urdf_path))
         # Alternative: self.model = pin.buildModelFromUrdf(str(urdf_path))
         self.data = self.model.createData()
         self.config = config
@@ -99,13 +99,13 @@ class KukaLeader(Teleoperator):
         
         
         self.joint_limits = {
-            "joint1": (-2.6878, 2.6878),  # Example limits in radians
+            "joint1": (-2.6878, 2.6878),  # limits in radians
             "joint2": (-1.701, 1.701),
             "joint3": (-1.482, 1.482), # -170*1000
             "joint4": (-1.74, 1.74), # [+- 100*1000]
             "joint5": (-1.22, 1.22), # [+-70*1000]
             "joint6": (-1.745, 1.745),
-            "joint7": (0.0, 0.08),  # Example limits for gripper
+            "joint7": (0.0, 0.08), 
         }
 
         self.home_positions = {
@@ -400,10 +400,10 @@ class KukaLeader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        # uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        # uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
-        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
+        uc = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]
+        uv = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]
+        # uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
+        # uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:
         #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
         #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
@@ -579,7 +579,7 @@ class KukaLeader(Teleoperator):
             MeshLambertMaterial(color=0x0000ff)
         )
         # Transform so it starts at origin and points along Z
-        R = Rotation.from_euler('x', -np.pi/2).as_matrix()
+        R = rotate('x', -np.pi/2)
         t = np.zeros(3)
         T_comp = pin.SE3(R, t)
         T = placement * T_comp#* pin.SE3(np.eye(3), np.array([0, 0, length / 2]))
