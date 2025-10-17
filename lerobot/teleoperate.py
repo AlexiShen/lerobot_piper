@@ -30,6 +30,7 @@ python -m lerobot.teleoperate \
 ```
 
 python -m lerobot.teleoperate --robot.type=piper_robot --teleop.type=so102_leader --teleop.port=/dev/ttyACM0 --teleop.id=right --display_data=false
+python -m lerobot.teleoperate --robot.type=kuka_robot --teleop.type=kuka_leader --teleop.port=/dev/ttyACM0 --teleop.id=kuka00 --display_data=false
 """
 
 import logging
