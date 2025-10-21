@@ -445,8 +445,8 @@ class KukaLeader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        uc = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]
-        uv = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]
+        uc = [0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.75]
+        uv = [0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.75]
         # uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
         # uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:
@@ -492,25 +492,25 @@ class KukaLeader(Teleoperator):
         """
         tau_following = np.zeros(7)
         
-        if robot_actual_pos is None:
-            return tau_following
+        # if robot_actual_pos is None:
+        #     return tau_following
         
-        # Convert observation dict to array (remove .pos suffix)
-        robot_pos_array = np.array([
-            robot_actual_pos.get(f"joint{i+1}.pos", 0.0) for i in range(6)
-        ])
-        robot_pos_array = np.append(robot_pos_array, robot_actual_pos.get("joint7.pos", 0.0))
+        # # Convert observation dict to array (remove .pos suffix)
+        # robot_pos_array = np.array([
+        #     robot_actual_pos.get(f"joint{i+1}.pos", 0.0) for i in range(6)
+        # ])
+        # robot_pos_array = np.append(robot_pos_array, robot_actual_pos.get("joint7.pos", 0.0))
         
-        q_leader_full = np.array([q_leader[f"joint{i+1}.pos"] for i in range(7)])
+        # q_leader_full = np.array([q_leader[f"joint{i+1}.pos"] for i in range(7)])
         
-        for i, joint_name in enumerate([f"joint{j+1}" for j in range(7)]):
-            position_lag = q_leader_full[i] - robot_pos_array[i]
+        # for i, joint_name in enumerate([f"joint{j+1}" for j in range(7)]):
+        #     position_lag = q_leader_full[i] - robot_pos_array[i]
             
-            # Only apply forces if the lag is significant
-            if abs(position_lag) > self.position_lag_threshold:
-                # Force proportional to lag, pulling leader back toward robot
-                force_magnitude = self.robot_following_gains[joint_name] * position_lag
-                tau_following[i] = -force_magnitude  # Negative to pull back
+        #     # Only apply forces if the lag is significant
+        #     if abs(position_lag) > self.position_lag_threshold:
+        #         # Force proportional to lag, pulling leader back toward robot
+        #         force_magnitude = self.robot_following_gains[joint_name] * position_lag
+        #         tau_following[i] = -force_magnitude  # Negative to pull back
                 
         return tau_following
     

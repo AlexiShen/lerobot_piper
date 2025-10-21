@@ -123,18 +123,10 @@ class KukaRobot(Robot):
         # Initialize ROS node (anonymous=True to allow multiple launches)
         rospy.init_node(self.node_name, anonymous=True)
 
-        # Publishers for each joint command topic
+        # Publishers for joint commands
         self.enable_pub = rospy.Publisher('/arm_controller/state', Bool, queue_size=10)
-        from std_msgs.msg import Float64
-        self.joint_pubs = {
-            "joint_a1": rospy.Publisher('/link_1_controller/command', Float64, queue_size=10),
-            "joint_a2": rospy.Publisher('/link_2_controller/command', Float64, queue_size=10),
-            "joint_a3": rospy.Publisher('/link_3_controller/command', Float64, queue_size=10),
-            "joint_a4": rospy.Publisher('/link_4_controller/command', Float64, queue_size=10),
-            "joint_a5": rospy.Publisher('/link_5_controller/command', Float64, queue_size=10),
-            "joint_a6": rospy.Publisher('/link_6_controller/command', Float64, queue_size=10),
-            "linear_axis_joint_e1": rospy.Publisher('/link_e_controller/command', Float64, queue_size=10),
-        }
+        from std_msgs.msg import Float64MultiArray
+        self.position_commands_pub = rospy.Publisher('/position_commands', Float64MultiArray, queue_size=10)
 
         # Subscribers (update to match available topics)
         self.joint_states_sub = rospy.Subscriber('/joint_states', JointState, self._joint_states_callback)
@@ -289,13 +281,27 @@ class KukaRobot(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        # Use topic joint names directly
+        # Convert action from kuka_leader style to robot style
         goal_pos = {key.removesuffix(".pos"): val for key, val in action.items()}
         converted_action = self._convert_action(goal_pos)
-        from std_msgs.msg import Float64
-        for joint, value in converted_action.items():
-            if joint in self.joint_pubs:
-                self.joint_pubs[joint].publish(Float64(value))
+        
+        # Create ordered joint position array [a1, a2, a3, a4, a5, a6, e1]
+        joint_order = ["joint_a1", "joint_a2", "joint_a3", "joint_a4", "joint_a5", "joint_a6", "linear_axis_joint_e1"]
+        position_array = []
+        
+        for joint in joint_order:
+            if joint in converted_action:
+                position_array.append(converted_action[joint])
+            else:
+                # If joint not in action, use 0.0 as default
+                position_array.append(0.0)
+        
+        # Publish to /position_commands topic
+        from std_msgs.msg import Float64MultiArray
+        msg = Float64MultiArray()
+        msg.data = position_array
+        self.position_commands_pub.publish(msg)
+        
         return {f"{motor}.pos": val for motor, val in converted_action.items()}
 
     def home(self) -> bool:
