@@ -124,16 +124,30 @@ def teleop_loop(
         load = teleop.get_load()
         velocity = teleop.get_velocity()
         observation, effort = robot.get_observation()
-        # is_robot_homed = robot.home()
-        # print(f"Robot is homed: {is_robot_homed}")
-        # if is_robot_homed:
-        #     if_arm_ready = teleop.if_arm_ready()
-        #     effort_to_send = teleop.send_force_feedback(observation, effort)
-        #     # print(f"if_arm_ready: {if_arm_ready} | is_robot_homed: {is_robot_homed} | h_state: {h_pressed}")
-        #     if if_arm_ready:
-        #         action_sent = robot.send_action(action, effort_to_send)
+        
+        # DEBUG: Print joint names once to see what we're working with
+        if loop_start - start < 1.0:  # Only print for first second
+            print(f"DEBUG: Action keys: {list(action.keys())}")
+            print(f"DEBUG: Observation keys: {list(observation.keys())}")
+        
+        # Send force feedback to teleoperator
         effort_to_send = teleop.send_force_feedback(observation, effort)
-        action_sent = robot.send_action(action, effort_to_send)
+        
+        # Check if arm is ready (synced) before allowing movement
+        if_arm_ready = teleop.if_arm_ready()
+        
+        # Always modify action to keep linear axis at current position
+        modified_action = action.copy()
+        
+        if if_arm_ready:
+            # Use modified action with linear axis override
+            action_sent = robot.send_action(modified_action, effort_to_send)
+        else:
+            # If not synced, send current position as hold command to prevent movement
+            # But still override linear axis to current position
+            hold_action = {key: observation.get(key, 0.0) for key in action.keys() if key.endswith('.pos')}
+            
+            action_sent = robot.send_action(hold_action, effort_to_send)
         #temporarily cancel homing check for testing
 
         # effort= {
@@ -199,7 +213,12 @@ def teleop_loop(
                 f"{eff_val:>{col_widths[5]}.2f}"
             )
         print('-' * len(header))
-        print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+        
+        # Display sync status
+        sync_status = "✅ SYNCED" if if_arm_ready else "⚠️  WAITING FOR SYNC"
+        print(f"\nStatus: {sync_status}")
+        print(f"time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
+        print("Press 'h' to home leader arm, 'r' to move to rest position")
 
         if duration is not None and time.perf_counter() - start >= duration:
             break

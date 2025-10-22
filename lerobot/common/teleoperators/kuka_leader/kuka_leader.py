@@ -355,6 +355,12 @@ class KukaLeader(Teleoperator):
         for motor, value in tau_dict.items():
             motor = motor.split(".")[0]
             pwm_int = np.round(value * 100).astype(int)
+            
+            # VOLTAGE PROTECTION: Limit PWM to safe range for STS3215 servos
+            # STS3215 safe PWM range is typically ±100 (adjust if needed)
+            max_pwm = 175  # Conservative limit to prevent voltage errors
+            pwm_int = np.clip(pwm_int, -max_pwm, max_pwm)
+            
             self.bus.write("Goal_Time", motor, pwm_int)
         # logger.info(f"{self} test sent feedback: {feedback}")
         # print("CoM:", self.model.inertias[2].lever)
@@ -391,7 +397,7 @@ class KukaLeader(Teleoperator):
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
         
         # Robot following forces - drag leader back when robot lags
-        tau_robot_following = self._compute_robot_following_forces(action, observation)
+        #tau_robot_following = self._compute_robot_following_forces(action, observation)
         
         if self.is_homed:
             tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
@@ -402,7 +408,7 @@ class KukaLeader(Teleoperator):
             self.is_going_to_rest = not self.position_reached
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        tau = tau_vf + tau_g + tau_joint + tau_trigger + tau_ss + tau_robot_following
+        tau = tau_vf + tau_g + tau_joint + tau_trigger + tau_ss# + tau_robot_following
         # tau = tau_trigger
         tau = self._safe_guard_torque(tau)
         effort_to_send = np.zeros(6)
@@ -445,8 +451,8 @@ class KukaLeader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        uc = [0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.75]
-        uv = [0.4, 0.4, 0.4, 0.5, 0.4, 0.5, 0.75]
+        uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
+        uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
         # uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
         # uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:

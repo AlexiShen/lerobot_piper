@@ -283,7 +283,33 @@ class KukaRobot(Robot):
 
         # Convert action from kuka_leader style to robot style
         goal_pos = {key.removesuffix(".pos"): val for key, val in action.items()}
-        converted_action = self._convert_action(goal_pos)
+
+        ######################################################################
+        # Temporarily hold linear axis position steady
+        ######################################################################
+        
+        # Filter out joint7 (gripper/trigger) to prevent it from controlling linear axis
+        filtered_goal_pos = {joint: val for joint, val in goal_pos.items() if joint != "joint7"}
+        
+        converted_action = self._convert_action(filtered_goal_pos)
+        
+        # Get current linear axis position to hold it steady
+        observation, _ = self.get_observation()
+        current_linear_pos = None
+        for obs_key, obs_val in observation.items():
+            if obs_key == "joint7.pos":  # This is the linear axis in leader style
+                # Convert back to robot style (linear_axis_joint_e1)
+                current_linear_pos = obs_val * self.transform["linear_axis_joint_e1"][0] + self.transform["linear_axis_joint_e1"][1]
+                break
+        
+        # If we couldn't get current position, use 0.0 as safe default
+        if current_linear_pos is None:
+            current_linear_pos = 0.0
+        
+        # Always set linear axis to current position to prevent movement
+        converted_action["linear_axis_joint_e1"] = current_linear_pos
+        ######################################################################
+        #######################################################################
         
         # Create ordered joint position array [a1, a2, a3, a4, a5, a6, e1]
         joint_order = ["joint_a1", "joint_a2", "joint_a3", "joint_a4", "joint_a5", "joint_a6", "linear_axis_joint_e1"]
