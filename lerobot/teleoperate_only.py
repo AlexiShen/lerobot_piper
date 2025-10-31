@@ -26,10 +26,16 @@ python -m lerobot.teleoperate_only \
 ```
 
 python -m lerobot.teleoperate_only --teleop.port=/dev/ttyACM0 --teleop.id=right --display_data=false
+python -m lerobot.teleoperate_only --teleop.type=kuka_leader --teleop.port=/dev/ttyACM0 --teleop.id=kuka00 --display_data=false
 """
 
 import logging
 import time
+import sys
+import select
+import termios
+import os
+import tty
 from dataclasses import asdict, dataclass
 from pprint import pformat
 
@@ -50,16 +56,31 @@ from lerobot.common.teleoperators import (
     TeleoperatorConfig,
     make_teleoperator_from_config,
     so102_leader,
+    kuka_leader,
 )
 from lerobot.common.utils.robot_utils import busy_wait
 from lerobot.common.utils.utils import init_logging, move_cursor_up
 from lerobot.common.utils.visualization_utils import _init_rerun
 
+def setup_terminal():
+    old_settings = termios.tcgetattr(sys.stdin)
+    tty.setcbreak(sys.stdin.fileno())
+    return old_settings
+
+def restore_terminal(old_settings):
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+def check_key_press():
+    dr, _, _ = select.select([sys.stdin], [], [], 0)
+    if dr:
+        return sys.stdin.read(1)
+    return None
+
 
 @dataclass
 class TeleoperateOnlyConfig:
-    #teleop: TeleoperatorConfig
-    teleop: so102_leader.SO102LeaderConfig
+    # teleop: TeleoperatorConfig
+    teleop: TeleoperatorConfig  # Accepts any teleoperator config, e.g., SO102LeaderConfig or KUKALeaderConfig
     fps: int = 60
     teleop_time_s: float | None = None
     display_data: bool = False
@@ -71,21 +92,30 @@ def teleop_only_loop(
     start = time.perf_counter()
     while True:
         loop_start = time.perf_counter()
+
+        # Check for 'h' key press
+        key = check_key_press()
+        if key == 'h':
+            teleop.lead_to_home()
+        elif key == 'r':
+            teleop.lead_to_rest()
+
         action = teleop.get_action()
         load = teleop.get_load()
         velocity = teleop.get_velocity()
 
         # Send feedback: set each joint to 0
         feedback = {joint: 0 for joint in action.keys()}
-        observation = {
-            "joint1.pos": 0,
-            "joint2.pos": 0,
-            "joint3.pos": 0,
-            "joint4.pos": 0,
-            "joint5.pos": 0,
-            "joint6.pos": 0,
-            "joint7.pos": 0.04,
-        }
+        # observation = {
+        #     "joint1.pos": 0,
+        #     "joint2.pos": 0,
+        #     "joint3.pos": 0,
+        #     "joint4.pos": 0,
+        #     "joint5.pos": 0,
+        #     "joint6.pos": 0,
+        #     "joint7.pos": 0.0,
+        # }
+        observation = action
         effort= {
             "joint1.effort": 0,
             "joint2.effort": -90,
@@ -96,6 +126,7 @@ def teleop_only_loop(
             "joint7.effort": 0,
                     }
         teleop.send_force_feedback(observation, effort)
+        # print(f"if_arms_synced: {teleop.sync_leader_position()}")
         # teleop.send_feedback(feedback)
 
         if display_data:

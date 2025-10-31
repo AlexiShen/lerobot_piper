@@ -28,16 +28,12 @@ from lerobot.common.motors.feetech import (
 )
 
 from ..teleoperator import Teleoperator
-from .config_so102_leader import SO102LeaderConfig
+from .config_kuka_leader import KUKALeaderConfig
 
 # from pydrake.all import MultibodyPlant, Parser, DiagramBuilder, JacobianWrtVariable
 import pinocchio as pin
 from pinocchio.utils import rotate  # Now available with proper pinocchio
-try:
-    from pinocchio.visualize import MeshcatVisualizer
-except ImportError:
-    # Fallback if MeshcatVisualizer is not available
-    MeshcatVisualizer = None
+from pinocchio.visualize import MeshcatVisualizer
 import meshcat
 from meshcat.geometry import Sphere, MeshLambertMaterial, Cylinder
 import scipy.spatial.transform
@@ -47,15 +43,15 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-class SO102Leader(Teleoperator):
+class KukaLeader(Teleoperator):
     """
-    SO-102 Leader Arm inspired by SO-101 designed by TheRobotStudio and Hugging Face.
+    Kuka Leader Arm for teleoperation.
     """
 
-    config_class = SO102LeaderConfig
-    name = "so102_leader"
+    config_class = KUKALeaderConfig
+    name = "kuka_leader"
 
-    def __init__(self, config: SO102LeaderConfig):
+    def __init__(self, config: KUKALeaderConfig):
         # Ensure calibration_dir is a Path before calling super().__init__
         if config.calibration_dir is None:
             config.calibration_dir = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -63,14 +59,14 @@ class SO102Leader(Teleoperator):
             config.calibration_dir = Path(config.calibration_dir)
         super().__init__(config)
         urdf_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-        urdf_path = urdf_dir / "Leader_arm_links.SLDASM/urdf"#"so102_description.urdf"
+        urdf_path = urdf_dir / "Kuka_leader_description/urdf/Kuka_leader_links.urdf"
         # self.builder = DiagramBuilder()
         # self.plant = MultibodyPlant(time_step=0.0)
-        # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM_old_convention.urdf")
+        # self.model_instance = Parser.AddModels("lerobot/common/teleoperators/kuka_leader/description/kuka_description.urdf")
         # self.plant.Finalize()
         # self.context = self.plant.CreateDefaultContext()
-        self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/Leader_arm_links.SLDASM/urdf/Leader_arm_links.SLDASM.urdf")
-        # self.model = pin.buildModelFromUrdf("lerobot/common/teleoperators/so102_leader/so102_description.urdf")
+        self.model = pin.buildModelFromUrdf(str(urdf_path))
+        # Alternative: self.model = pin.buildModelFromUrdf(str(urdf_path))
         self.data = self.model.createData()
         self.config = config
 
@@ -103,13 +99,13 @@ class SO102Leader(Teleoperator):
         
         
         self.joint_limits = {
-            "joint1": (-2.6878, 2.6878),  # Example limits in radians
+            "joint1": (-2.6878, 2.6878),  # limits in radians
             "joint2": (-1.701, 1.701),
             "joint3": (-1.482, 1.482), # -170*1000
             "joint4": (-1.74, 1.74), # [+- 100*1000]
             "joint5": (-1.22, 1.22), # [+-70*1000]
             "joint6": (-1.745, 1.745),
-            "joint7": (0.0, 0.08),  # Example limits for gripper
+            "joint7": (0.0, 0.08), 
         }
 
         self.home_positions = {
@@ -139,6 +135,31 @@ class SO102Leader(Teleoperator):
 
         self.if_synced = False
         self.joint_integrals = np.zeros(6)
+        
+        # Delta limiting parameters for smooth robot following
+        self.max_joint_delta = {
+            "joint1": 0.03,  # rad per timestep (conservative starting values)
+            "joint2": 0.02,
+            "joint3": 0.02,
+            "joint4": 0.05,
+            "joint5": 0.05,
+            "joint6": 0.08,
+            "joint7": 0.01,
+        }
+        
+        # Robot following force parameters
+        self.robot_following_gains = {
+            "joint1": 3.0,  # Force gain when robot lags behind leader
+            "joint2": 4.0,
+            "joint3": 4.0,
+            "joint4": 2.0,
+            "joint5": 2.0,
+            "joint6": 1.5,
+            "joint7": 2.0,
+        }
+        
+        self.last_robot_position = None
+        self.position_lag_threshold = 0.05  # rad - threshold for applying drag-back forces
 
     @property
     def action_features(self) -> dict[str, type]:
@@ -203,9 +224,9 @@ class SO102Leader(Teleoperator):
                 range_max=range_maxes[motor],
             )
 
-        # Save calibration file in the SO102Leader directory
+        # Save calibration file in the KukaLeader directory
         self.bus.write_calibration(self.calibration)
-        # calibration_fpath = self.calibration_dir / f"{self.id}_so102_calibration.json"
+        # calibration_fpath = self.calibration_dir / f"{self.id}_kuka_calibration.json"
         # self._save_calibration(fpath=calibration_fpath)
         # logger.info(f"Calibration saved to {calibration_fpath}")
         self._save_calibration()
@@ -260,6 +281,20 @@ class SO102Leader(Teleoperator):
             self._visualize_joint_origins(q)
         # self._print_joint_model_info()
         return action
+    
+    def get_limited_action(self, current_robot_pos: dict[str, float]) -> dict[str, float]:
+        """
+        Get leader action with delta limiting applied to prevent robot from lagging too far behind
+        """
+        raw_action = self.get_action()
+        
+        if current_robot_pos is None:
+            return raw_action
+            
+        # Apply delta limiting based on what the robot can actually achieve
+        limited_action = self._limit_position_delta(current_robot_pos, raw_action)
+        
+        return limited_action
     
     def get_velocity(self) -> dict[str, float]:
         start = time.perf_counter()
@@ -320,6 +355,12 @@ class SO102Leader(Teleoperator):
         for motor, value in tau_dict.items():
             motor = motor.split(".")[0]
             pwm_int = np.round(value * 100).astype(int)
+            
+            # VOLTAGE PROTECTION: Limit PWM to safe range for STS3215 servos
+            # STS3215 safe PWM range is typically ±100 (adjust if needed)
+            max_pwm = 175  # Conservative limit to prevent voltage errors
+            pwm_int = np.clip(pwm_int, -max_pwm, max_pwm)
+            
             self.bus.write("Goal_Time", motor, pwm_int)
         # logger.info(f"{self} test sent feedback: {feedback}")
         # print("CoM:", self.model.inertias[2].lever)
@@ -346,12 +387,18 @@ class SO102Leader(Teleoperator):
         gripper_pos = observation["joint7.pos"]
         gripper_effort = effort["joint7.effort"]
 
+        # Store robot position for delta limiting and following forces
+        self.last_robot_position = observation
 
         # pin.forwardKinematics(self.model, self.data, q)
         # joint2_id = self.model.getJointId("joint2")
         tau_g = self._compute_gravity_compensation(q, q_dot)
         tau_ss = self._compute_static_friction_compensation(q_dot_ee, freq=500)
         tau_vf = self._compute_viscous_friction_compensation(q_dot_ee)
+        
+        # Robot following forces - drag leader back when robot lags
+        #tau_robot_following = self._compute_robot_following_forces(action, observation)
+        
         if self.is_homed:
             tau_joint = self._compute_joint_diff_compensation(q, q_dot, q_follower, valid_joints)
         else:
@@ -361,7 +408,7 @@ class SO102Leader(Teleoperator):
             self.is_going_to_rest = not self.position_reached
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
 
-        tau =  tau_vf + tau_g + tau_joint + tau_trigger + tau_ss 
+        tau = tau_vf + tau_g + tau_joint + tau_trigger + tau_ss# + tau_robot_following
         # tau = tau_trigger
         tau = self._safe_guard_torque(tau)
         effort_to_send = np.zeros(6)
@@ -404,10 +451,10 @@ class SO102Leader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        # uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        # uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
-        uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
-        uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
+        uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
+        uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
+        # uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
+        # uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:
         #     uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.3]
         #     uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
@@ -443,6 +490,62 @@ class SO102Leader(Teleoperator):
         # print("if_synced:", self.if_synced, "tau_joint:", tau_joint)
         tau_joint = np.append(tau_joint, 0)
         return tau_joint
+    
+    def _compute_robot_following_forces(self, q_leader, robot_actual_pos):
+        """
+        Compute forces to drag the leader arm back toward the robot's actual position
+        when the robot is lagging behind due to speed/acceleration limits
+        """
+        tau_following = np.zeros(7)
+        
+        # if robot_actual_pos is None:
+        #     return tau_following
+        
+        # # Convert observation dict to array (remove .pos suffix)
+        # robot_pos_array = np.array([
+        #     robot_actual_pos.get(f"joint{i+1}.pos", 0.0) for i in range(6)
+        # ])
+        # robot_pos_array = np.append(robot_pos_array, robot_actual_pos.get("joint7.pos", 0.0))
+        
+        # q_leader_full = np.array([q_leader[f"joint{i+1}.pos"] for i in range(7)])
+        
+        # for i, joint_name in enumerate([f"joint{j+1}" for j in range(7)]):
+        #     position_lag = q_leader_full[i] - robot_pos_array[i]
+            
+        #     # Only apply forces if the lag is significant
+        #     if abs(position_lag) > self.position_lag_threshold:
+        #         # Force proportional to lag, pulling leader back toward robot
+        #         force_magnitude = self.robot_following_gains[joint_name] * position_lag
+        #         tau_following[i] = -force_magnitude  # Negative to pull back
+                
+        return tau_following
+    
+    def _limit_position_delta(self, current_action, target_action):
+        """
+        Limit the change in leader position to prevent too-rapid movements
+        that the robot cannot follow
+        """
+        if self.last_robot_position is None:
+            return target_action
+        
+        limited_action = target_action.copy()
+        
+        for joint in target_action:
+            if joint.endswith('.pos'):
+                joint_name = joint.replace('.pos', '')
+                
+                if joint_name in self.max_joint_delta:
+                    current_val = current_action.get(joint, 0.0)
+                    target_val = target_action[joint]
+                    delta = target_val - current_val
+                    
+                    max_delta = self.max_joint_delta[joint_name]
+                    
+                    if abs(delta) > max_delta:
+                        limited_delta = np.sign(delta) * max_delta
+                        limited_action[joint] = current_val + limited_delta
+                        
+        return limited_action
         
     def _compute_gripper_force(self, trigger_pos, trigger_vel, gripper_pos, gripper_effort):
         trigger_tau = 0
@@ -532,6 +635,26 @@ class SO102Leader(Teleoperator):
             elif tau[i] < -2.5:
                 tau[i] = -2.5
         return tau
+    
+    def update_force_feedback_params(self, **kwargs):
+        """
+        Update force feedback parameters for real-time tuning
+        
+        Usage:
+        leader.update_force_feedback_params(
+            robot_following_gains={"joint1": 2.0, "joint2": 3.0},
+            max_joint_delta={"joint1": 0.05},
+            position_lag_threshold=0.08
+        )
+        """
+        if 'robot_following_gains' in kwargs:
+            self.robot_following_gains.update(kwargs['robot_following_gains'])
+        if 'max_joint_delta' in kwargs:
+            self.max_joint_delta.update(kwargs['max_joint_delta'])
+        if 'position_lag_threshold' in kwargs:
+            self.position_lag_threshold = kwargs['position_lag_threshold']
+            
+        logger.info(f"Updated force feedback parameters: {kwargs}")
 
     def _visualize_joint_origins(self, q=None):
         """
