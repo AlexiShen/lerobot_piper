@@ -53,6 +53,10 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
         from .piper_robot import PiperRobot
 
         return PiperRobot(config)
+    elif config.type == "kuka_robot":
+        from .kuka_robot import KukaRobot
+
+        return KukaRobot(config)
     else:
         raise ValueError(config.type)
 

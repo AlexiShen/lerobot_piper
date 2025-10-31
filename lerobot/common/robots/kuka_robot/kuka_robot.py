@@ -31,43 +31,44 @@ from std_srvs.srv import Trigger  # Common for simple enable/reset/stop services
 
 from ..robot import Robot
 # from ..utils import ensure_safe_goal_position
-from .config_piper_robot import PiperRobotConfig
+from .config_kuka_robot import KukaRobotConfig
 import math
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-class PiperRobot(Robot):
+class KukaRobot(Robot):
 
-    config_class = PiperRobotConfig
-    name = "piper_robot"
+    config_class = KukaRobotConfig
+    name = "kuka_robot"
 
-    def __init__(self, config: PiperRobotConfig):
+    def __init__(self, config: KukaRobotConfig):
         super().__init__(config)
         self.config = config
         self.robot_type = self.config.type
-        self.node_name = f"{self.name}_piper"
+        self.node_name = f"{self.name}_kuka"
         self.is_connected = False
         self.logs = {}
 
+
         self.joints = {
-            "joint1": 0.0,
-            "joint2": 0.0,
-            "joint3": 0.0,
-            "joint4": 0.0,
-            "joint5": 0.0,
-            "joint6": 0.0,
-            "joint7": 0.0,
+            "joint_a1": 0.0,
+            "joint_a2": 0.0,
+            "joint_a3": 0.0,
+            "joint_a4": 0.0,
+            "joint_a5": 0.0,
+            "joint_a6": 0.0,
+            "linear_axis_joint_e1": 0.0,
         }
 
         self.joint_limits = {
-            "joint1": (-2.6878, 2.6878),  # Example limits in radians
-            "joint2": (0, 3.403),
-            "joint3": (-2.965, 0), # -170*1000
-            "joint4": (-1.74, 1.74), # [+- 100*1000]
-            "joint5": (-1.22, 1.22), # [+-70*1000]
-            "joint6": (-1.745, 1.745),
-            "joint7": (0.0, 0.08),  # Example limits for gripper
+            "joint_a1": (-3.2, 3.2),
+            "joint_a2": (-2.4, -0.0873),
+            "joint_a3": (-2.1, 2.9),
+            "joint_a4": (-6.1, 6.1),
+            "joint_a5": (-2.15, 2.15),
+            "joint_a6": (-6.1, 6.1),
+            "linear_axis_joint_e1": (0.0, 0.08),
         }
 
         # self.home_position = {
@@ -90,14 +91,14 @@ class PiperRobot(Robot):
         # } 
         
         self.home_position = {
-            "joint1": -0.12,   # -0.12 rad
-            "joint2": -0.2,
-            "joint3": 0.2,
-            "joint4": 0,
-            "joint5": 1,
-            "joint6": -0.08,
-            "joint7": 0.0735, 
-        } 
+            "joint_a1": -0.12,
+            "joint_a2": -0.2,
+            "joint_a3": 0.2,
+            "joint_a4": 0,
+            "joint_a5": 1,
+            "joint_a6": -0.08,
+            "linear_axis_joint_e1": 0.0,
+        }
 
         #-0.46570246800000004, 1.823107328, -1.58531072, -0.08441151600000002, 1.2499149320000003, -0.17218972400000002, 0.0735
         self.is_homed = False
@@ -109,29 +110,32 @@ class PiperRobot(Robot):
         # }
 
         self.transform = {
-            "joint1": (-1, 0),
-            "joint2": (1, 1.55),
-            "joint3": (1, -1.63),
-            "joint4": (-1, 0),
-            "joint5": (1, 0),
-            "joint6": (-1, 0),
-            "joint7": (1, 0),  
+            "joint_a1": (1, 0),
+            "joint_a2": (1, -1.64),
+            "joint_a3": (1, 1.51),
+            "joint_a4": (1, 0),
+            "joint_a5": (1, 0),
+            "joint_a6": (1, 0),
+            "linear_axis_joint_e1": (1, 0),
         }
 
 
         # Initialize ROS node (anonymous=True to allow multiple launches)
         rospy.init_node(self.node_name, anonymous=True)
 
-        # Publishers
-        self.enable_pub = rospy.Publisher('/right_arm/enable_flag', Bool, queue_size=10)
-        self.joint_pub = rospy.Publisher('/right_arm/joint_ctrl_single', JointState, queue_size=10)
+        # Publishers for joint commands
+        self.enable_pub = rospy.Publisher('/arm_controller/state', Bool, queue_size=10)
+        from std_msgs.msg import Float64MultiArray
+        self.position_commands_pub = rospy.Publisher('/position_commands', Float64MultiArray, queue_size=10)
 
-        # Subscribers (add callbacks as needed)
-        self.arm_status_sub = rospy.Subscriber('/right_arm/arm_status', rospy.AnyMsg, self._arm_status_callback)
-        self.end_pose_sub = rospy.Subscriber('/right_arm/end_pose', PoseStamped, self._end_pose_callback)
-        self.end_pose_euler_sub = rospy.Subscriber('/right_arm/end_pose_euler', rospy.AnyMsg, self._end_pose_euler_callback)
-        self.joint_states_single_sub = rospy.Subscriber('/right_arm/joint_states_single', JointState, self._joint_states_single_callback)
-        self.pos_cmd_sub = rospy.Subscriber('/right_arm/pos_cmd', JointState, self._pos_cmd_callback)
+        # Subscribers (update to match available topics)
+        self.joint_states_sub = rospy.Subscriber('/joint_states', JointState, self._joint_states_callback)
+        # The following subscribers are commented out because their topics do not exist in your topic list:
+        # self.arm_status_sub = rospy.Subscriber('/right_arm/arm_status', rospy.AnyMsg, self._arm_status_callback)
+        # self.end_pose_sub = rospy.Subscriber('/right_arm/end_pose', PoseStamped, self._end_pose_callback)
+        # self.end_pose_euler_sub = rospy.Subscriber('/right_arm/end_pose_euler', rospy.AnyMsg, self._end_pose_euler_callback)
+        # self.joint_states_single_sub = rospy.Subscriber('/right_arm/joint_states_single', JointState, self._joint_states_callback)
+        # self.pos_cmd_sub = rospy.Subscriber('/right_arm/pos_cmd', JointState, self._pos_cmd_callback)
 
         # Service proxies
         self.enable_srv = rospy.ServiceProxy('/enable_srv', Trigger)
@@ -145,7 +149,7 @@ class PiperRobot(Robot):
         self.current_arm_status = None
         self.current_end_pose = None
         self.current_end_pose_euler = None
-        self.current_joint_states_single = None
+        self.current_joint_states = None
         self.current_pos_cmd = None
 
     def _arm_status_callback(self, msg):
@@ -157,8 +161,8 @@ class PiperRobot(Robot):
     def _end_pose_euler_callback(self, msg):
         self.current_end_pose_euler = msg
 
-    def _joint_states_single_callback(self, msg):
-        self.current_joint_states_single = msg
+    def _joint_states_callback(self, msg):
+        self.current_joint_states = msg
 
     def _pos_cmd_callback(self, msg):
         self.current_pos_cmd = msg
@@ -199,43 +203,68 @@ class PiperRobot(Robot):
 
         observation = {}
         effort = {}
-        if self.current_joint_states_single:
+        if self.current_joint_states:
+            # Use the topic joint names directly
             for name, position, effort_val in zip(
-                self.current_joint_states_single.name, 
-                self.current_joint_states_single.position, 
-                self.current_joint_states_single.effort
-                ):
-                #Increment joint index
-                if name.startswith("joint") and name[5:].isdigit():
-                    idx = int(name[5:]) + 1
-                    name = f"joint{idx}"
-                
+                self.current_joint_states.name,
+                self.current_joint_states.position,
+                self.current_joint_states.effort if hasattr(self.current_joint_states, 'effort') else [0.0]*len(self.current_joint_states.name)
+            ):
                 converted_position = self._convert_observation(name, position)
-                observation[f"{name}.pos"]  = converted_position
-                effort[f"{name}.effort"] = effort_val
+                kuka_joint_name = self._convert_joint_name_to_leader_style(name)
+                observation[f"{kuka_joint_name}.pos"] = converted_position
+                effort[f"{kuka_joint_name}.effort"] = effort_val
 
         return observation, effort
 
-    # Convert so102 action to piper action
+    # Convert kuka_leader action to piper action
     # input action should have .pos removed from the keys
     def _convert_action(self, action: dict[str, float]) -> dict[str, float]:
         converted_action = {}
         for joint, value in action.items():
+            # Convert from kuka_leader style to kuka_robot style if needed
+            robot_joint_name = self._convert_joint_name_to_robot_style(joint)
             # print(self.joint_limits)
-            if joint in self.joint_limits:
-                converted_value = value* self.transform[joint][0] + self.transform[joint][1]
-                # so102 joint angles [rad] converted to piper joint angles [rad]
-                min_limit, max_limit = self.joint_limits[joint]
+            if robot_joint_name in self.joint_limits:
+                converted_value = value* self.transform[robot_joint_name][0] + self.transform[robot_joint_name][1]
+                # kuka_leader joint angles [rad] converted to piper joint angles [rad]
+                min_limit, max_limit = self.joint_limits[robot_joint_name]
                 # Ensure the value is within the joint limits
                 safe_value = self._ensure_safe_goal_position(converted_value, min_limit, max_limit)
-                converted_action[joint] = safe_value
+                converted_action[robot_joint_name] = safe_value
             else:
-                raise ValueError(f"Joint {joint} not recognized in limits.")
+                raise ValueError(f"Joint {joint} (robot style: {robot_joint_name}) not recognized in limits.")
         return converted_action
     
     def _convert_observation(self, name, value):
         converted_value = value * self.transform[name][0] - self.transform[name][1]
         return converted_value
+    
+    def _convert_joint_name_to_leader_style(self, ros_joint_name):
+        """Convert ROS joint names to kuka_leader style"""
+        joint_name_mapping = {
+            "joint_a1": "joint1",
+            "joint_a2": "joint2", 
+            "joint_a3": "joint3",
+            "joint_a4": "joint4",
+            "joint_a5": "joint5",
+            "joint_a6": "joint6",
+            "linear_axis_joint_e1": "joint7"
+        }
+        return joint_name_mapping.get(ros_joint_name, ros_joint_name)
+    
+    def _convert_joint_name_to_robot_style(self, leader_joint_name):
+        """Convert kuka_leader joint names back to ROS/kuka_robot style"""
+        reverse_joint_name_mapping = {
+            "joint1": "joint_a1",
+            "joint2": "joint_a2",
+            "joint3": "joint_a3", 
+            "joint4": "joint_a4",
+            "joint5": "joint_a5",
+            "joint6": "joint_a6",
+            "joint7": "linear_axis_joint_e1"
+        }
+        return reverse_joint_name_mapping.get(leader_joint_name, leader_joint_name)
 
     def _ensure_safe_goal_position(self, value: float, min_limit: float, max_limit: float) -> float:
         """
@@ -251,25 +280,54 @@ class PiperRobot(Robot):
     def send_action(self, action: dict[str, float], effort: dict[str, float], velocity: dict[str, float] = None) -> dict[str, float]:
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
-        
-        # if self.teleop is None:
-        #     raise ValueError("Teleoperator not set for the robot")
 
-        # goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
+        # Convert action from kuka_leader style to robot style
         goal_pos = {key.removesuffix(".pos"): val for key, val in action.items()}
-        converted_action = self._convert_action(goal_pos)
-        joint_state_msg = JointState()
-        joint_state_msg.name = list(converted_action.keys())      # Compliant with ROS JointState
-        joint_state_msg.position = list(converted_action.values())
-        if effort["joint7.effort"] >= 0.5:
-            joint_state_msg.effort = list(effort.values())
-        if velocity:
-            joint_state_msg.velocity = list(velocity.values())
-        # else:
-        #     joint_state_msg.velocity = [20, 20, 20, 20, 20, 20, 20]
-        self.joint_pub.publish(joint_state_msg)
-        # print(f"Sending action: {joint_state_msg}")
 
+        ######################################################################
+        # Temporarily hold linear axis position steady
+        ######################################################################
+        
+        # Filter out joint7 (gripper/trigger) to prevent it from controlling linear axis
+        filtered_goal_pos = {joint: val for joint, val in goal_pos.items() if joint != "joint7"}
+        
+        converted_action = self._convert_action(filtered_goal_pos)
+        
+        # Get current linear axis position to hold it steady
+        observation, _ = self.get_observation()
+        current_linear_pos = None
+        for obs_key, obs_val in observation.items():
+            if obs_key == "joint7.pos":  # This is the linear axis in leader style
+                # Convert back to robot style (linear_axis_joint_e1)
+                current_linear_pos = obs_val * self.transform["linear_axis_joint_e1"][0] + self.transform["linear_axis_joint_e1"][1]
+                break
+        
+        # If we couldn't get current position, use 0.0 as safe default
+        if current_linear_pos is None:
+            current_linear_pos = 0.0
+        
+        # Always set linear axis to current position to prevent movement
+        converted_action["linear_axis_joint_e1"] = current_linear_pos
+        ######################################################################
+        #######################################################################
+        
+        # Create ordered joint position array [a1, a2, a3, a4, a5, a6, e1]
+        joint_order = ["joint_a1", "joint_a2", "joint_a3", "joint_a4", "joint_a5", "joint_a6", "linear_axis_joint_e1"]
+        position_array = []
+        
+        for joint in joint_order:
+            if joint in converted_action:
+                position_array.append(converted_action[joint])
+            else:
+                # If joint not in action, use 0.0 as default
+                position_array.append(0.0)
+        
+        # Publish to /position_commands topic
+        from std_msgs.msg import Float64MultiArray
+        msg = Float64MultiArray()
+        msg.data = position_array
+        self.position_commands_pub.publish(msg)
+        
         return {f"{motor}.pos": val for motor, val in converted_action.items()}
 
     def home(self) -> bool:
@@ -287,17 +345,19 @@ class PiperRobot(Robot):
             self.is_homed = True
         # Send home position
         if not self.is_homed:
-            self.send_action(home_action, effort, velocity)
-            
+            self.send_action(home_action, effort, velocity)  
         return self.is_homed
 
     def _check_if_homed(self) -> bool:
         observation, effort = self.get_observation()
         observation = {key.removesuffix(".pos"): val for key, val in observation.items()}
         for joint, value in observation.items():
-            error = value - self.home_position[joint]
-            if abs(error) > 0.15:
-                return False
+            # Convert kuka_leader joint name to robot style for home_position lookup
+            robot_joint = self._convert_joint_name_to_robot_style(joint)
+            if robot_joint in self.home_position:
+                error = value - self.home_position[robot_joint]
+                if abs(error) > 0.15:
+                    return False
         return True
 
     
