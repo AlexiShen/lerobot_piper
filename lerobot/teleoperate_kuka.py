@@ -159,14 +159,7 @@ def teleop_loop(
                     hybrid_action["joint7.pos"] = observation[obs_key]
                     break
         
-        if if_arm_ready:
-            # Use hybrid action when synced
-            action_sent = robot.send_action(hybrid_action, effort_to_send)
-        else:
-            # If not synced, send current observation positions to hold everything
-            hold_action = {key: observation.get(key, 0.0) for key in action.keys() if key.endswith('.pos')}
-            action_sent = robot.send_action(hold_action, effort_to_send)
-        #temporarily cancel homing check for testing
+        action_sent = robot.send_action(hybrid_action, effort_to_send)
 
         # effort= {
         #     "joint1.effort": 0,
