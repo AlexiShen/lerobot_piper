@@ -132,7 +132,7 @@ def teleop_loop(
         if loop_start - start < 1.0:  # Only print for first second
             print(f"DEBUG: Action keys: {list(action.keys())}")
             print(f"DEBUG: Observation keys: {list(observation.keys())}")
-            print(f"DEBUG: Controlling joint: {CONTROLLED_JOINT}")
+            # print(f"DEBUG: Controlling joint: {CONTROLLED_JOINT}")
         
         # Send force feedback to teleoperator
         effort_to_send = teleop.send_force_feedback(observation, effort)
@@ -145,6 +145,7 @@ def teleop_loop(
         for joint_key in action.keys():
             if joint_key.endswith('.pos'):
                 if joint_key == CONTROLLED_JOINT and if_arm_ready:
+                # if if_arm_ready:
                     # Use teleoperator action for the controlled joint (only when synced)
                     hybrid_action[joint_key] = action[joint_key]
                 else:
@@ -216,9 +217,9 @@ def teleop_loop(
             load.items(), action.items(), velocity.items(), observation.items(), effort.items()
         ):
             # Highlight the controlled joint
-            marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
+            # marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
             print(
-                f"{marker}{motor:<{col_widths[0]-4}} | "
+                # f"{marker}{motor:<{col_widths[0]-4}} | "
                 f"{action_val:>{col_widths[1]}.2f} | "
                 f"{load_val:>{col_widths[2]}.2f} | "
                 f"{velocity_val:>{col_widths[3]}.2f} | "
@@ -230,7 +231,7 @@ def teleop_loop(
         # Display sync status and controlled joint
         sync_status = "✅ SYNCED" if if_arm_ready else "⚠️  WAITING FOR SYNC"
         print(f"\nStatus: {sync_status}")
-        print(f"Controlling: {CONTROLLED_JOINT}")
+        # print(f"Controlling: {CONTROLLED_JOINT}")
         print(f"time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
         print("Press 'h' to home, 'r' to rest, '1'-'6' to switch controlled joint")
 
