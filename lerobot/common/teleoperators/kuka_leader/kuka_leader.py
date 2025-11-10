@@ -358,7 +358,7 @@ class KukaLeader(Teleoperator):
             
             # VOLTAGE PROTECTION: Limit PWM to safe range for STS3215 servos
             # STS3215 safe PWM range is typically ±100 (adjust if needed)
-            max_pwm = 175  # Conservative limit to prevent voltage errors
+            max_pwm = 165  # Conservative limit to prevent voltage errors
             pwm_int = np.clip(pwm_int, -max_pwm, max_pwm)
             
             self.bus.write("Goal_Time", motor, pwm_int)
@@ -407,6 +407,7 @@ class KukaLeader(Teleoperator):
             tau_joint = self._lead_to_position(action, velocity, self.rest_positions)
             self.is_going_to_rest = not self.position_reached
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
+        tau_trigger = 0
 
         tau = tau_vf + tau_g + tau_joint + tau_trigger + tau_ss# + tau_robot_following
         # tau = tau_trigger

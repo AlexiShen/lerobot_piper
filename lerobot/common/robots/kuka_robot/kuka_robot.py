@@ -202,20 +202,23 @@ class KukaRobot(Robot):
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
         observation = {}
+        velocity = {}
         effort = {}
         if self.current_joint_states:
             # Use the topic joint names directly
-            for name, position, effort_val in zip(
+            for name, position, velocity_val, effort_val in zip(
                 self.current_joint_states.name,
                 self.current_joint_states.position,
+                self.current_joint_states.velocity if hasattr(self.current_joint_states, 'velocity') else [0.0]*len(self.current_joint_states.name),
                 self.current_joint_states.effort if hasattr(self.current_joint_states, 'effort') else [0.0]*len(self.current_joint_states.name)
             ):
                 converted_position = self._convert_observation(name, position)
                 kuka_joint_name = self._convert_joint_name_to_leader_style(name)
                 observation[f"{kuka_joint_name}.pos"] = converted_position
                 effort[f"{kuka_joint_name}.effort"] = effort_val
+                velocity[f"{kuka_joint_name}.vel"] = velocity_val
 
-        return observation, effort
+        return observation, effort, velocity
 
     # Convert kuka_leader action to piper action
     # input action should have .pos removed from the keys
@@ -294,7 +297,7 @@ class KukaRobot(Robot):
         converted_action = self._convert_action(filtered_goal_pos)
         
         # Get current linear axis position to hold it steady
-        observation, _ = self.get_observation()
+        observation, _, velocity_obs = self.get_observation()
         current_linear_pos = None
         for obs_key, obs_val in observation.items():
             if obs_key == "joint7.pos":  # This is the linear axis in leader style
@@ -311,10 +314,12 @@ class KukaRobot(Robot):
         ######################################################################
         #######################################################################
         
-        # Create ordered joint position array [a1, a2, a3, a4, a5, a6, e1]
+        # Create ordered joint arrays [a1, a2, a3, a4, a5, a6, e1]
         joint_order = ["joint_a1", "joint_a2", "joint_a3", "joint_a4", "joint_a5", "joint_a6", "linear_axis_joint_e1"]
         position_array = []
+        velocity_array = []
         
+        # Build position array
         for joint in joint_order:
             if joint in converted_action:
                 position_array.append(converted_action[joint])
@@ -322,10 +327,25 @@ class KukaRobot(Robot):
                 # If joint not in action, use 0.0 as default
                 position_array.append(0.0)
         
+        # Build velocity array (default to 0.0 if not provided)
+        for joint in joint_order:
+            # Convert robot joint name back to leader style for velocity lookup
+            leader_joint_name = self._convert_joint_name_to_leader_style(joint)
+            velocity_key = f"{leader_joint_name}.vel"
+            
+            if velocity and velocity_key in velocity:
+                velocity_array.append(velocity[velocity_key])
+            else:
+                # Default velocity (you can adjust this as needed)
+                velocity_array.append(0.0)
+        
+        # Combine arrays: [pos1, pos2, ..., vel1, vel2, ...]
+        combined_array = position_array + velocity_array
+        
         # Publish to /position_commands topic
         from std_msgs.msg import Float64MultiArray
         msg = Float64MultiArray()
-        msg.data = position_array
+        msg.data = combined_array
         self.position_commands_pub.publish(msg)
         
         return {f"{motor}.pos": val for motor, val in converted_action.items()}

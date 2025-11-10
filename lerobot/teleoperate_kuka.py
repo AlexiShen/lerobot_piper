@@ -30,6 +30,7 @@ python -m lerobot.teleoperate \
 ```
 
 python -m lerobot.teleoperate --robot.type=piper_robot --teleop.type=so102_leader --teleop.port=/dev/ttyACM0 --teleop.id=right --display_data=false
+
 python -m lerobot.teleoperate_kuka --robot.type=kuka_robot --teleop.type=kuka_leader --teleop.port=/dev/ttyACM0 --teleop.id=kuka00 --display_data=false
 """
 
@@ -122,11 +123,15 @@ def teleop_loop(
             # Allow user to switch which joint to control
             CONTROLLED_JOINT = f"joint{key}.pos"
             print(f"\nNow controlling: {CONTROLLED_JOINT}")
+        elif key == 'a':
+            # Control all joints mode
+            CONTROLLED_JOINT = "ALL"
+            print(f"\nNow controlling: ALL JOINTS")
         
         action = teleop.get_action()
         load = teleop.get_load()
         velocity = teleop.get_velocity()
-        observation, effort = robot.get_observation()
+        observation, effort, velocity_obs = robot.get_observation()
         
         # DEBUG: Print joint names once to see what we're working with
         if loop_start - start < 1.0:  # Only print for first second
@@ -142,15 +147,24 @@ def teleop_loop(
 
         # Create single hybrid action: controlled joint from teleoperator, others from observation
         hybrid_action = {}
-        for joint_key in action.keys():
+        hybrid_velocity = {}
+        for joint_key in action.keys    ():
             if joint_key.endswith('.pos'):
-                if joint_key == CONTROLLED_JOINT and if_arm_ready:
-                # if if_arm_ready:
+                # Convert .pos key to .vel key for velocity lookup
+                velocity_key = joint_key.replace('.pos', '.vel')
+                
+                if CONTROLLED_JOINT == "ALL" and if_arm_ready:
+                    # Control all joints mode - use all teleoperator actions when synced
+                    hybrid_action[joint_key] = action[joint_key]
+                    hybrid_velocity[velocity_key] = velocity[velocity_key]
+                elif joint_key == CONTROLLED_JOINT and if_arm_ready:
                     # Use teleoperator action for the controlled joint (only when synced)
                     hybrid_action[joint_key] = action[joint_key]
+                    hybrid_velocity[velocity_key] = velocity[velocity_key]
                 else:
                     # Use current observation for all other joints (hold position)
                     hybrid_action[joint_key] = observation.get(joint_key, 0.0)
+                    hybrid_velocity[velocity_key] = 0.0  # Zero velocity for held joints
         
         # Always keep linear axis at current position regardless of which joint is controlled
         if "joint7.pos" in hybrid_action:
@@ -159,8 +173,8 @@ def teleop_loop(
                 if "joint7" in obs_key:  # This will match joint7.pos from observation
                     hybrid_action["joint7.pos"] = observation[obs_key]
                     break
-        
-        action_sent = robot.send_action(hybrid_action, effort_to_send)
+
+        action_sent = robot.send_action(hybrid_action, effort_to_send, hybrid_velocity)
 
         # effort= {
         #     "joint1.effort": 0,
@@ -216,10 +230,13 @@ def teleop_loop(
         for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val), (joint2, eff_val) in zip(
             load.items(), action.items(), velocity.items(), observation.items(), effort.items()
         ):
-            # Highlight the controlled joint
-            # marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
+            # Highlight the controlled joint(s)
+            if CONTROLLED_JOINT == "ALL":
+                marker = ">>> " if if_arm_ready else "    "
+            else:
+                marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
             print(
-                # f"{marker}{motor:<{col_widths[0]-4}} | "
+                f"{marker}{motor:<{col_widths[0]-4}} | "
                 f"{action_val:>{col_widths[1]}.2f} | "
                 f"{load_val:>{col_widths[2]}.2f} | "
                 f"{velocity_val:>{col_widths[3]}.2f} | "
@@ -230,10 +247,11 @@ def teleop_loop(
         
         # Display sync status and controlled joint
         sync_status = "✅ SYNCED" if if_arm_ready else "⚠️  WAITING FOR SYNC"
+        controlled_display = "ALL JOINTS" if CONTROLLED_JOINT == "ALL" else CONTROLLED_JOINT
         print(f"\nStatus: {sync_status}")
-        # print(f"Controlling: {CONTROLLED_JOINT}")
+        print(f"Controlling: {controlled_display}")
         print(f"time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
-        print("Press 'h' to home, 'r' to rest, '1'-'6' to switch controlled joint")
+        print("Press 'h' to home, 'r' to rest, '1'-'6' for single joint, 'a' for all joints")
 
         if duration is not None and time.perf_counter() - start >= duration:
             break
