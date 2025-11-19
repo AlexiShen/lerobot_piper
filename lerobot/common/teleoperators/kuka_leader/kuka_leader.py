@@ -409,7 +409,7 @@ class KukaLeader(Teleoperator):
         tau_trigger, gripper_effort_to_send = self._compute_gripper_force(trigger_pos, trigger_vel, gripper_pos, gripper_effort)
         tau_trigger = 0
 
-        tau = tau_vf + tau_g + tau_joint + tau_trigger + tau_ss# + tau_robot_following
+        tau = tau_vf + tau_g + tau_joint #+ tau_trigger + tau_ss# + tau_robot_following
         # tau = tau_trigger
         tau = self._safe_guard_torque(tau)
         effort_to_send = np.zeros(6)
@@ -452,8 +452,8 @@ class KukaLeader(Teleoperator):
     def _compute_viscous_friction_compensation(self, q_dot):
         tau_vf = np.zeros_like(q_dot)
         q_threshold = 0.1
-        uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
-        uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.75]
+        uc = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5]
+        uv = [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5]
         # uc = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.45]
         # uv = [0.33, 0.3, 0.33, 0.33, 0.33, 0.33, 0.55]
         # if self.if_gripping:

@@ -127,6 +127,7 @@ class KukaRobot(Robot):
         self.enable_pub = rospy.Publisher('/arm_controller/state', Bool, queue_size=10)
         from std_msgs.msg import Float64MultiArray
         self.position_commands_pub = rospy.Publisher('/position_commands', Float64MultiArray, queue_size=10)
+        self.gripper_pub = rospy.Publisher('/open_gripper', Bool, queue_size=10)
 
         # Subscribers (update to match available topics)
         self.joint_states_sub = rospy.Subscriber('/joint_states', JointState, self._joint_states_callback)
@@ -286,6 +287,7 @@ class KukaRobot(Robot):
 
         # Convert action from kuka_leader style to robot style
         goal_pos = {key.removesuffix(".pos"): val for key, val in action.items()}
+        trigger_state = action.get("joint7.pos", 0.0)
 
         ######################################################################
         # Temporarily hold linear axis position steady
@@ -344,10 +346,22 @@ class KukaRobot(Robot):
         
         # Publish to /position_commands topic
         from std_msgs.msg import Float64MultiArray
+        from std_msgs.msg import Bool
         msg = Float64MultiArray()
         msg.data = combined_array
         self.position_commands_pub.publish(msg)
-        
+
+        # Publish trigger state
+        print(f"Trigger state: {trigger_state}")
+        if trigger_state < 0.04:
+            open_gripper = False
+        elif trigger_state >= 0.04:
+            open_gripper = True
+
+        trigger_msg = Bool()
+        trigger_msg.data = open_gripper
+        self.gripper_pub.publish(trigger_msg)
+
         return {f"{motor}.pos": val for motor, val in converted_action.items()}
 
     def home(self) -> bool:

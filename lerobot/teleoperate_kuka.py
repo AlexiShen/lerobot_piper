@@ -148,7 +148,7 @@ def teleop_loop(
         # Create single hybrid action: controlled joint from teleoperator, others from observation
         hybrid_action = {}
         hybrid_velocity = {}
-        for joint_key in action.keys    ():
+        for joint_key in action.keys():
             if joint_key.endswith('.pos'):
                 # Convert .pos key to .vel key for velocity lookup
                 velocity_key = joint_key.replace('.pos', '.vel')
@@ -166,13 +166,13 @@ def teleop_loop(
                     hybrid_action[joint_key] = observation.get(joint_key, 0.0)
                     hybrid_velocity[velocity_key] = 0.0  # Zero velocity for held joints
         
-        # Always keep linear axis at current position regardless of which joint is controlled
-        if "joint7.pos" in hybrid_action:
-            # Find the corresponding observation key for linear axis
-            for obs_key in observation.keys():
-                if "joint7" in obs_key:  # This will match joint7.pos from observation
-                    hybrid_action["joint7.pos"] = observation[obs_key]
-                    break
+        # # Always keep linear axis at current position regardless of which joint is controlled
+        # if "joint7.pos" in hybrid_action:
+        #     # Find the corresponding observation key for linear axis
+        #     for obs_key in observation.keys():
+        #         if "joint7" in obs_key:  # This will match joint7.pos from observation
+        #             hybrid_action["joint7.pos"] = observation[obs_key]
+        #             break
 
         action_sent = robot.send_action(hybrid_action, effort_to_send, hybrid_velocity)
 
@@ -221,29 +221,31 @@ def teleop_loop(
         
         # print(f"\ntime: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
         # os.system('clear')
-        col_widths = [16, 10, 10, 10, 10, 10]
-        header_fields = ["NAME", "ACTION", "LOAD", "VELOCITY", "OBSERV", "EFFORT"]
-        header = " | ".join(f"{name:<{w}}" for name, w in zip(header_fields, col_widths))
-        print('-' * len(header))
-        print(header)
-        print('-' * len(header))
-        for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val), (joint2, eff_val) in zip(
-            load.items(), action.items(), velocity.items(), observation.items(), effort.items()
-        ):
-            # Highlight the controlled joint(s)
-            if CONTROLLED_JOINT == "ALL":
-                marker = ">>> " if if_arm_ready else "    "
-            else:
-                marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
-            print(
-                f"{marker}{motor:<{col_widths[0]-4}} | "
-                f"{action_val:>{col_widths[1]}.2f} | "
-                f"{load_val:>{col_widths[2]}.2f} | "
-                f"{velocity_val:>{col_widths[3]}.2f} | "
-                f"{obs_val:>{col_widths[4]}.2f} | "
-                f"{eff_val:>{col_widths[5]}.2f}"
-            )
-        print('-' * len(header))
+
+        ################################################
+        # col_widths = [16, 10, 10, 10, 10, 10]
+        # header_fields = ["NAME", "ACTION", "LOAD", "VELOCITY", "OBSERV", "EFFORT"]
+        # header = " | ".join(f"{name:<{w}}" for name, w in zip(header_fields, col_widths))
+        # print('-' * len(header))
+        # print(header)
+        # print('-' * len(header))
+        # for (motor, load_val), (motor2, action_val), (motor3, velocity_val), (joint, obs_val), (joint2, eff_val) in zip(
+        #     load.items(), action.items(), velocity.items(), observation.items(), effort.items()
+        # ):
+        #     # Highlight the controlled joint(s)
+        #     if CONTROLLED_JOINT == "ALL":
+        #         marker = ">>> " if if_arm_ready else "    "
+        #     else:
+        #         marker = ">>> " if f"{motor2}" == CONTROLLED_JOINT else "    "
+        #     print(
+        #         f"{marker}{motor:<{col_widths[0]-4}} | "
+        #         f"{action_val:>{col_widths[1]}.2f} | "
+        #         f"{load_val:>{col_widths[2]}.2f} | "
+        #         f"{velocity_val:>{col_widths[3]}.2f} | "
+        #         f"{obs_val:>{col_widths[4]}.2f} | "
+        #         f"{eff_val:>{col_widths[5]}.2f}"
+        #     )
+        # print('-' * len(header))
         
         # Display sync status and controlled joint
         sync_status = "✅ SYNCED" if if_arm_ready else "⚠️  WAITING FOR SYNC"
