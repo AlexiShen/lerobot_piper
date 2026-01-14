@@ -49,6 +49,20 @@ import numpy as np
 import rerun as rr
 import rospy
 
+try:
+    from apriltag_ros.msg import AprilTagDetectionArray
+    _APRILTAG_AVAILABLE = True
+except ImportError:
+    AprilTagDetectionArray = None
+    _APRILTAG_AVAILABLE = False
+
+try:
+    from gazebo_msgs.msg import LinkStates
+    _GAZEBO_AVAILABLE = True
+except ImportError:
+    LinkStates = None
+    _GAZEBO_AVAILABLE = False
+
 from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
 from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.common.robots import (  # noqa: F401
@@ -96,10 +110,91 @@ class TeleoperateConfig:
     teleop_time_s: float | None = None
     # Display all cameras on screen
     display_data: bool = False
+    ee_link_name: str = "link_6"
+    ee_topic: str = "/gazebo/link_states"
+    tag_topic: str = "/tag_detections"
+    ee_timeout_s: float = 0.5
+    tag_timeout_s: float = 0.5
+
+
+@dataclass
+class TeleopPerceptionState:
+    ee_pose: object | None = None
+    ee_pose_stamp_s: float | None = None
+    tag_count: int | None = None
+    tag_stamp_s: float | None = None
+    ee_link_warned: bool = False
+
+
+class TeleopPerception:
+    def __init__(self, ee_link_name: str, ee_topic: str, tag_topic: str):
+        self.ee_link_name = ee_link_name
+        self.ee_topic = ee_topic
+        self.tag_topic = tag_topic
+        self.state = TeleopPerceptionState()
+        self._setup_subscribers()
+
+    def _setup_subscribers(self) -> None:
+        if _GAZEBO_AVAILABLE:
+            self._ee_sub = rospy.Subscriber(self.ee_topic, LinkStates, self._ee_callback)
+        else:
+            logging.warning("gazebo_msgs not available; skipping end-effector subscriber.")
+        if _APRILTAG_AVAILABLE:
+            self._tag_sub = rospy.Subscriber(self.tag_topic, AprilTagDetectionArray, self._tag_callback)
+        else:
+            self._tag_sub = rospy.Subscriber(self.tag_topic, rospy.AnyMsg, self._tag_any_callback)
+
+    def _ee_callback(self, msg: LinkStates) -> None:
+        idx = None
+        for i, name in enumerate(msg.name):
+            if name == self.ee_link_name or name.endswith(f"::{self.ee_link_name}"):
+                idx = i
+                break
+        if idx is None:
+            if not self.state.ee_link_warned:
+                logging.warning(
+                    "End-effector link '%s' not found in %s. Example links: %s",
+                    self.ee_link_name,
+                    self.ee_topic,
+                    msg.name[:5],
+                )
+                self.state.ee_link_warned = True
+            return
+        self.state.ee_pose = msg.pose[idx]
+        self.state.ee_pose_stamp_s = rospy.get_time()
+
+    def _tag_callback(self, msg: AprilTagDetectionArray) -> None:
+        self.state.tag_count = len(msg.detections)
+        self.state.tag_stamp_s = rospy.get_time()
+
+    def _tag_any_callback(self, _msg: rospy.AnyMsg) -> None:
+        self.state.tag_count = -1
+        self.state.tag_stamp_s = rospy.get_time()
+
+    def get_recent_ee_pose(self, max_age_s: float) -> object | None:
+        if self.state.ee_pose_stamp_s is None:
+            return None
+        if rospy.get_time() - self.state.ee_pose_stamp_s > max_age_s:
+            return None
+        return self.state.ee_pose
+
+    def get_recent_tag_count(self, max_age_s: float) -> int | None:
+        if self.state.tag_stamp_s is None:
+            return None
+        if rospy.get_time() - self.state.tag_stamp_s > max_age_s:
+            return None
+        return self.state.tag_count
 
 
 def teleop_loop(
-    teleop: Teleoperator, robot: Robot, fps: int, display_data: bool = False, duration: float | None = None
+    teleop: Teleoperator,
+    robot: Robot,
+    fps: int,
+    perception: TeleopPerception | None = None,
+    display_data: bool = False,
+    duration: float | None = None,
+    ee_timeout_s: float = 0.5,
+    tag_timeout_s: float = 0.5,
 ):
     # display_len = max(len(key) for key in robot.action_features)
     display_len = max(len(key) for key in teleop.action_features)
@@ -250,8 +345,22 @@ def teleop_loop(
         # Display sync status and controlled joint
         sync_status = "✅ SYNCED" if if_arm_ready else "⚠️  WAITING FOR SYNC"
         controlled_display = "ALL JOINTS" if CONTROLLED_JOINT == "ALL" else CONTROLLED_JOINT
+        ee_pose = perception.get_recent_ee_pose(ee_timeout_s) if perception else None
+        tag_count = perception.get_recent_tag_count(tag_timeout_s) if perception else None
+        if ee_pose is not None:
+            ee_text = f"EE: ({ee_pose.position.x:.3f}, {ee_pose.position.y:.3f}, {ee_pose.position.z:.3f})"
+        else:
+            ee_text = "EE: (no data)"
+        if tag_count is None:
+            tag_text = "Tags: (no data)"
+        elif tag_count < 0:
+            tag_text = "Tags: (msg)"
+        else:
+            tag_text = f"Tags: {tag_count}"
         print(f"\nStatus: {sync_status}")
         print(f"Controlling: {controlled_display}")
+        print(ee_text)
+        print(tag_text)
         print(f"time: {loop_s * 1e3:.2f}ms ({1 / loop_s:.0f} Hz)")
         print("Press 'h' to home, 'r' to rest, '1'-'6' for single joint, 'a' for all joints")
 
@@ -313,13 +422,23 @@ def teleoperate(cfg: TeleoperateConfig):
 
     teleop = make_teleoperator_from_config(cfg.teleop)
     robot = make_robot_from_config(cfg.robot)
+    perception = TeleopPerception(cfg.ee_link_name, cfg.ee_topic, cfg.tag_topic)
 
     teleop.connect()
     robot.connect()
     old_settings = setup_terminal()
     try:
         
-        teleop_loop(teleop, robot, cfg.fps, display_data=cfg.display_data, duration=cfg.teleop_time_s)
+        teleop_loop(
+            teleop,
+            robot,
+            cfg.fps,
+            perception=perception,
+            display_data=cfg.display_data,
+            duration=cfg.teleop_time_s,
+            ee_timeout_s=cfg.ee_timeout_s,
+            tag_timeout_s=cfg.tag_timeout_s,
+        )
     except KeyboardInterrupt:
         print("\nTeleoperation interrupted by user")
     finally:
